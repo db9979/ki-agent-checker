@@ -1,8 +1,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, CheckCircle2, Crosshair, Gavel, Play, Radio, Siren, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ScoreGauge } from "../components/ScoreGauge";
-import { type Attack, type Message, liveScore, useRun } from "../lib/runStore";
+import { ArenaStage } from "../components/hud/ArenaStage";
+import { ReplayBar } from "../components/hud/ReplayBar";
+import { type Attack, type Message, useRun } from "../lib/runStore";
+import { useEffectsMode } from "../lib/settings";
 
 const ROLE = {
   attacker: { label: "Angreifer", icon: Crosshair, color: "#f43f5e", align: "self-start" },
@@ -39,7 +41,7 @@ function Bubble({ m }: { m: Message }) {
       initial={{ opacity: 0, y: 12, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 260, damping: 24 }}
-      className={`${r.align} max-w-[78%]`}
+      className={`${r.align} max-w-[88%]`}
     >
       <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium" style={{ color: r.color }}>
         <Icon size={13} /> {r.label}
@@ -88,6 +90,7 @@ function AttackItem({ a, active, onClick }: { a: Attack; active: boolean; onClic
 
 export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
   const run = useRun();
+  const mode = useEffectsMode();
   const [selected, setSelected] = useState<string | null>(null);
   const followLatest = selected === null;
   const current = followLatest ? run.attacks.at(-1) : run.attacks.find((a) => a.id === selected);
@@ -100,9 +103,6 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
   useEffect(() => {
     if (run.status === "running" && run.done === 0) setSelected(null);
   }, [run.status, run.done]);
-
-  const hits = run.attacks.filter((a) => a.success).length;
-  const blocked = run.attacks.filter((a) => a.success === false).length;
 
   return (
     <div className="grid grid-cols-12 content-start gap-4">
@@ -127,83 +127,59 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
         </button>
       </header>
 
-      <aside className="panel col-span-12 flex max-h-[calc(100vh-8rem)] flex-col p-3 lg:col-span-3">
-        <div className="mb-2 grid grid-cols-2 gap-2 text-center">
-          <div className="rounded-lg bg-red/10 p-2">
-            <div className="text-xl font-semibold tabular-nums text-red">{hits}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted">Durchgebrochen</div>
-          </div>
-          <div className="rounded-lg bg-green/10 p-2">
-            <div className="text-xl font-semibold tabular-nums text-green">{blocked}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted">Abgewehrt</div>
-          </div>
-        </div>
-        <div className="flex-1 space-y-1 overflow-y-auto">
-          {run.attacks.map((a) => (
-            <AttackItem key={a.id} a={a} active={a.id === current?.id} onClick={() => setSelected(a.id)} />
-          ))}
-        </div>
-        {!followLatest && (
-          <button onClick={() => setSelected(null)} className="mt-2 rounded-lg bg-panel-2 py-1.5 text-xs text-cyan">
-            Dem aktuellen Angriff folgen
-          </button>
-        )}
-      </aside>
-
-      <section className="panel grid-bg col-span-12 flex max-h-[calc(100vh-8rem)] flex-col lg:col-span-6">
-        {current ? (
-          <>
-            <div className="flex items-center gap-2 border-b border-line px-5 py-3 text-sm">
-              <span className="font-medium">{current.technique}</span>
-              <span className="text-muted">· {current.moduleLabel}</span>
-              <span className="ml-auto rounded-md bg-violet/15 px-2 py-0.5 text-[11px] text-violet">{current.owasp}</span>
-              {current.atlas && <span className="rounded-md bg-cyan/10 px-2 py-0.5 text-[11px] text-cyan">{current.atlas}</span>}
-            </div>
-            <div ref={streamRef} className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-              {current.messages.map((m, i) => (
-                <Bubble key={i} m={m} />
-              ))}
-              <AnimatePresence>
-                {current.success !== undefined && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className={`self-center rounded-full px-4 py-1.5 text-xs font-semibold ${
-                      current.success ? "glow-red bg-red/20 text-red" : "bg-green/15 text-green"
-                    }`}
-                  >
-                    {current.success ? `Durchgebrochen · ${SIGNAL_LABEL[current.signal ?? ""] ?? ""}` : "Abgewehrt"}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted">Noch keine Angriffe</div>
-        )}
+      <section className="panel col-span-12 h-[calc(100vh-13rem)] min-h-[380px] p-0 xl:col-span-8">
+        <ArenaStage run={run} mode={mode} />
       </section>
 
-      <aside className="panel col-span-12 flex flex-col items-center gap-4 p-5 lg:col-span-3">
-        <ScoreGauge score={liveScore(run)} label="Live-Score" />
-        <div className="w-full space-y-2">
-          {run.modules.map((m) => {
-            const rate = m.attempts ? m.hits / m.attempts : 0;
-            return (
-              <div key={m.key}>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">{m.label}</span>
-                  <span className="tabular-nums">
-                    {m.hits}/{m.attempts}
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#0b1222]">
-                  <motion.div className="h-full rounded-full bg-red" animate={{ width: `${rate * 100}%` }} />
-                </div>
+      <div className="col-span-12 flex h-[calc(100vh-13rem)] min-h-[380px] flex-col gap-4 xl:col-span-4">
+        <section className="panel grid-bg flex min-h-0 flex-1 flex-col">
+          {current ? (
+            <>
+              <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-xs">
+                <span className="truncate font-medium">{current.technique}</span>
+                <span className="ml-auto shrink-0 rounded-md bg-violet/15 px-2 py-0.5 text-[10px] text-violet">{current.owasp}</span>
               </div>
-            );
-          })}
-        </div>
-      </aside>
+              <div ref={streamRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+                {current.messages.map((m, i) => (
+                  <Bubble key={i} m={m} />
+                ))}
+                <AnimatePresence>
+                  {current.success !== undefined && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className={`self-center rounded-full px-4 py-1.5 text-xs font-semibold ${
+                        current.success ? "glow-red bg-red/20 text-red" : "bg-green/15 text-green"
+                      }`}
+                    >
+                      {current.success ? `Durchgebrochen · ${SIGNAL_LABEL[current.signal ?? ""] ?? ""}` : "Abgewehrt"}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted">Noch keine Angriffe</div>
+          )}
+        </section>
+
+        <aside className="panel flex max-h-[40%] min-h-[120px] flex-col p-2">
+          <div className="flex-1 space-y-0.5 overflow-y-auto">
+            {run.attacks.map((a) => (
+              <AttackItem key={a.id} a={a} active={a.id === current?.id} onClick={() => setSelected(a.id)} />
+            ))}
+          </div>
+          {!followLatest && (
+            <button onClick={() => setSelected(null)} className="mt-2 rounded-lg bg-panel-2 py-1.5 text-xs text-cyan">
+              Dem aktuellen Angriff folgen
+            </button>
+          )}
+        </aside>
+      </div>
+
+      <div className="col-span-12">
+        <ReplayBar />
+      </div>
     </div>
   );
 }

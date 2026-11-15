@@ -128,6 +128,11 @@ export function dispatch(e: EngineEvent) {
   set(reduce(state, e));
 }
 
+/** Setzt den Zustand auf das Ergebnis einer Event-Folge (für die Wiedergabe). */
+export function reduceAll(events: EngineEvent[]) {
+  set(events.reduce(reduce, { ...initial, online: state.online }));
+}
+
 export function useRun(): RunState {
   return useSyncExternalStore(
     (l) => {
