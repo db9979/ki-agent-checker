@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS projects (
     authorized_at TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS run_graphs (
+    run_id TEXT PRIMARY KEY,
+    graph TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     project_id TEXT,
@@ -268,6 +272,20 @@ class Store:
                 (run_id, json.dumps(log, ensure_ascii=False)),
             )
             self._db.commit()
+
+    def save_run_graph(self, run_id: str, graph: dict) -> None:
+        with self._lock:
+            self._db.execute(
+                "INSERT OR REPLACE INTO run_graphs (run_id, graph) VALUES (?, ?)",
+                (run_id, json.dumps(graph, ensure_ascii=False)),
+            )
+            self._db.commit()
+
+    def get_run_graph(self, run_id: str) -> dict | None:
+        row = self._db.execute(
+            "SELECT graph FROM run_graphs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        return json.loads(row["graph"]) if row else None
 
     def get_run_log(self, run_id: str) -> list[dict]:
         row = self._db.execute("SELECT log FROM run_logs WHERE run_id = ?", (run_id,)).fetchone()

@@ -67,6 +67,8 @@ def collect_log(events: list[dict]) -> list[dict]:
                 "module_label": e.get("module_label"),
                 "owasp": e.get("owasp"),
                 "technique": e.get("technique"),
+                "tool": e.get("tool"),
+                "tool_calls": [],
                 "attack": "",
                 "reply": "",
                 "verdict": "",
@@ -78,6 +80,8 @@ def collect_log(events: list[dict]) -> list[dict]:
                 a["attack"] = text[:600]
             elif e.get("role") == "target":
                 a["reply"] = text[:600]
+                if (call := e.get("tool_call")) and call.get("name"):
+                    a["tool_calls"].append(call["name"])
             elif e.get("role") == "judge":
                 a["verdict"] = text[:400]
         elif e["type"] == "attack.finished" and aid in attacks:

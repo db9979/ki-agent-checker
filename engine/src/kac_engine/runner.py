@@ -11,7 +11,7 @@ import secrets
 from dataclasses import dataclass, field
 
 from . import attacks as lib
-from . import providers
+from . import graph, providers
 from .demo import score
 from .events import EventHub
 from .honeypot import ModelAgent, dangerous, new_canary
@@ -127,6 +127,9 @@ async def run_target(
         total=total,
         modules=[{"key": m.key, "label": m.label, "owasp": m.owasp} for m, _ in planned],
     )
+    g = graph.agent_graph(target)
+    store.save_run_graph(run_id, g)
+    await hub.publish("run.graph", run_id, graph=g)
     convo = Conversations(cfg, keys)
     judge_key = keys.get(f"provider:{cfg.judge.id}") if cfg.judge else None
     attacker_key = keys.get(f"provider:{cfg.attacker.id}") if cfg.attacker else None

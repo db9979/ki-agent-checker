@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { EngineEvent, Finding, Severity } from "./types";
+import type { EngineEvent, Finding, GraphData, Severity } from "./types";
 
 export interface Message {
   role: "attacker" | "target" | "judge";
@@ -14,6 +14,7 @@ export interface Attack {
   owasp: string;
   atlas: string | null;
   technique: string;
+  tool?: string | null;
   messages: Message[];
   success?: boolean;
   signal?: string;
@@ -52,6 +53,7 @@ export interface RunState {
   online: boolean;
   error: string | null;
   scanner: ScannerStatus | null;
+  graph: GraphData | null;
 }
 
 const initial: RunState = {
@@ -67,6 +69,7 @@ const initial: RunState = {
   online: false,
   error: null,
   scanner: null,
+  graph: null,
 };
 
 let state: RunState = initial;
@@ -127,6 +130,7 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
             owasp: e.owasp as string,
             atlas: (e.atlas as string) ?? null,
             technique: e.technique as string,
+            tool: (e.tool as string) ?? null,
             messages: [],
           },
         ],
@@ -177,6 +181,8 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
         scanner: { ...next, prompt: next.prompt ?? s.scanner?.prompt, reply: next.reply ?? s.scanner?.reply },
       };
     }
+    case "run.graph":
+      return { ...s, graph: e.graph as GraphData };
     case "run.error":
       return { ...s, error: e.error as string };
     case "run.finished":

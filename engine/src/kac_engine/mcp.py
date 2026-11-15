@@ -29,7 +29,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from . import __version__
+from . import __version__, graph
 from .demo import score
 from .events import EventHub
 from .keystore import SecretStore
@@ -546,6 +546,7 @@ class Probe:
     technique: str
     request: str
     run: Any  # async () -> (success, signal, reply, verdict_text, tool_call | None)
+    tool: str | None = None  # betroffenes Tool, für den Angriffsgraphen
 
 
 @dataclass
@@ -754,7 +755,12 @@ def _poison_probe(technique: str, text: str, tool: dict | None) -> Probe:
             call,
         )
 
-    return Probe(technique, "Beschreibung lesen und auf versteckte Anweisungen prüfen", run)
+    return Probe(
+        technique,
+        "Beschreibung lesen und auf versteckte Anweisungen prüfen",
+        run,
+        tool.get("name") if tool else None,
+    )
 
 
 def _agency_probe(tool: dict) -> Probe:
@@ -789,7 +795,12 @@ def _agency_probe(tool: dict) -> Probe:
             call,
         )
 
-    return Probe(f"Rechte von {tool.get('name')}", "Fähigkeiten und Kennzeichnung prüfen", run)
+    return Probe(
+        f"Rechte von {tool.get('name')}",
+        "Fähigkeiten und Kennzeichnung prüfen",
+        run,
+        tool.get("name"),
+    )
 
 
 def _inject_probe(client: McpClient, tool: dict, param: str, p: Payload) -> Probe:
@@ -808,6 +819,7 @@ def _inject_probe(client: McpClient, tool: dict, param: str, p: Payload) -> Prob
         f"{p.technique} · {tool.get('name')}.{param}",
         f"tools/call {tool.get('name')} {param}={p.value}",
         run,
+        tool.get("name"),
     )
 
 
@@ -831,6 +843,7 @@ def _error_probe(client: McpClient, tool: dict) -> Probe:
         f"Falsche Datentypen · {tool.get('name')}",
         f"tools/call {tool.get('name')} mit falschen Typen",
         run,
+        tool.get("name"),
     )
 
 
@@ -858,7 +871,10 @@ def _output_probe(client: McpClient, tool: dict) -> Probe:
         )
 
     return Probe(
-        f"Ergebnis von {tool.get('name')}", f"tools/call {tool.get('name')} mit Beispielwerten", run
+        f"Ergebnis von {tool.get('name')}",
+        f"tools/call {tool.get('name')} mit Beispielwerten",
+        run,
+        tool.get("name"),
     )
 
 
@@ -897,6 +913,9 @@ async def run_mcp(
                 for p in plans
             ],
         )
+        g = graph.mcp_graph(client.server_info.get("name") or "MCP-Server", tools)
+        store.save_run_graph(run_id, g)
+        await hub.publish("run.graph", run_id, graph=g)
         done = 0
         errors_in_row = 0
         for plan in plans:
@@ -913,6 +932,7 @@ async def run_mcp(
                     owasp=mod.owasp,
                     atlas=mod.atlas,
                     technique=probe.technique,
+                    tool=probe.tool,
                 )
                 await hub.publish(
                     "message", run_id, attack_id=attack_id, role="attacker", text=probe.request

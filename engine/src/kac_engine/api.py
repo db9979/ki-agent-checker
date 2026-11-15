@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from . import __version__, mcp, providers, report, scanners, skills
 from . import attacks as attack_lib
 from . import compare as compare_lib
+from . import graph as graph_lib
 from .demo import run_demo
 from .events import EventHub
 from .keystore import SecretStore
@@ -346,6 +347,29 @@ def create_app(
     def list_runs() -> list[RunSummary]:
         return store.list_runs()
 
+    @app.get("/runs/{run_id}/graph", dependencies=protected)
+    def run_graph(run_id: str) -> dict:
+        """Graph eines Laufs und das Ergebnis jedes Angriffs, um die Kanten einzufärben."""
+        g = store.get_run_graph(run_id)
+        if g is None:
+            raise HTTPException(404, "Für diesen Lauf gibt es keinen Graphen")
+        log = store.get_run_log(run_id) or report.collect_log(hub.history(run_id))
+        return {
+            "graph": g,
+            "attacks": [
+                {
+                    "id": a["id"],
+                    "module": a["module"],
+                    "tool": a.get("tool"),
+                    "tool_calls": a.get("tool_calls", []),
+                    "success": a.get("success"),
+                    "signal": a.get("signal"),
+                    "technique": a.get("technique"),
+                }
+                for a in log
+            ],
+        }
+
     @app.get("/runs/compare", dependencies=protected)
     def compare_runs(a: str, b: str) -> dict:
         run_a, run_b = store.get_run(a), store.get_run(b)
@@ -486,6 +510,7 @@ def create_app(
                     target_id=target.id,
                     project_id=project_id,
                     run_id=run_id,
+                    graph=graph_lib.agent_graph(target),
                 )
             finally:
                 await convo.close()
