@@ -74,6 +74,20 @@ fn start_engine(app: &tauri::AppHandle) -> Result<(EngineInfo, Option<CommandChi
     ))
 }
 
+/// Auf kleinen Bildschirmen (z. B. uConsole mit 1280×720) maximiert starten,
+/// statt ein 1440×900-Fenster über den Rand ragen zu lassen.
+fn fit_small_screens(app: &tauri::App) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    if let Ok(Some(monitor)) = window.current_monitor() {
+        let size = monitor.size().to_logical::<f64>(monitor.scale_factor());
+        if size.width < 1500.0 || size.height < 960.0 {
+            let _ = window.maximize();
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -85,6 +99,7 @@ pub fn run() {
             let engine = app.state::<Engine>();
             *engine.info.lock().unwrap() = Some(info);
             *engine.child.lock().unwrap() = child;
+            fit_small_screens(app);
             Ok(())
         })
         .build(tauri::generate_context!())

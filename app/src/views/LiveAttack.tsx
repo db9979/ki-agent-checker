@@ -127,7 +127,7 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
         </button>
       </header>
 
-      <aside className="panel col-span-12 flex max-h-[70vh] flex-col p-3 lg:col-span-3">
+      <aside className="panel col-span-12 flex max-h-[calc(100vh-8rem)] flex-col p-3 lg:col-span-3">
         <div className="mb-2 grid grid-cols-2 gap-2 text-center">
           <div className="rounded-lg bg-red/10 p-2">
             <div className="text-xl font-semibold tabular-nums text-red">{hits}</div>
@@ -150,7 +150,7 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
         )}
       </aside>
 
-      <section className="panel grid-bg col-span-12 flex max-h-[70vh] flex-col lg:col-span-6">
+      <section className="panel grid-bg col-span-12 flex max-h-[calc(100vh-8rem)] flex-col lg:col-span-6">
         {current ? (
           <>
             <div className="flex items-center gap-2 border-b border-line px-5 py-3 text-sm">

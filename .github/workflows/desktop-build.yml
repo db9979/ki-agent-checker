@@ -16,14 +16,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux
+          - name: Linux (x64)
             os: ubuntu-22.04
+          # ARM64, z. B. ClockworkPi uConsole (CM4/CM5) mit Raspberry Pi OS oder Debian bookworm.
+          # Gebaut auf Ubuntu 22.04 (glibc 2.35), damit es auf bookworm (glibc 2.36) läuft.
+          - name: Linux (ARM64, uConsole)
+            os: ubuntu-22.04-arm
           - name: Windows
             os: windows-latest
           - name: macOS (Apple Silicon)
             os: macos-latest
-          - name: macOS (Intel)
-            os: macos-13
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -52,13 +54,19 @@ jobs:
 
       - name: Desktop-App bauen
         working-directory: app
+        shell: bash
         run: |
           npm ci
-          npx tauri build --config src-tauri/tauri.release.conf.json
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            # .deb für Raspberry Pi OS/Debian, AppImage für andere Distributionen
+            npx tauri build --config src-tauri/tauri.release.conf.json --bundles deb,appimage
+          else
+            npx tauri build --config src-tauri/tauri.release.conf.json
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ki-agent-checker-${{ matrix.os }}
+          name: ki-agent-checker-${{ matrix.os }}-${{ runner.arch }}
           path: |
             app/src-tauri/target/release/bundle/**/*.msi
             app/src-tauri/target/release/bundle/**/*.exe

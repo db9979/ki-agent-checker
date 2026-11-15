@@ -48,7 +48,7 @@ export function TrendChart({ data }: { data: { label: string; score: number }[] 
 export function ModuleRadar({ data }: { data: { module: string; resistance: number }[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <RadarChart data={data} outerRadius="72%">
+      <RadarChart data={data} outerRadius="62%">
         <PolarGrid stroke="#1e2a44" />
         <PolarAngleAxis dataKey="module" tick={{ fill: "#7c8db5", fontSize: 11 }} />
         <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} %`, "Widerstand"]} />

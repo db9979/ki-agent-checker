@@ -15,8 +15,8 @@
         "title": "KI-Agent-Checker",
         "width": 1440,
         "height": 900,
-        "minWidth": 1100,
-        "minHeight": 700,
+        "minWidth": 960,
+        "minHeight": 600,
         "backgroundColor": "#070b14"
       }
     ],

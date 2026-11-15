@@ -48,8 +48,12 @@ export function ScoreGauge({ score, label = "Security-Score" }: { score: number 
           style={{ strokeDasharray: dash }}
           filter="url(#gauge-glow)"
         />
-        <motion.line x1="110" y1="110" x2={needleX} y2={needleY} stroke="#e6ecff" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx="110" cy="110" r="6" fill="#e6ecff" />
+        {score !== null && (
+          <>
+            <motion.line x1="110" y1="110" x2={needleX} y2={needleY} stroke="#e6ecff" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="110" cy="110" r="6" fill="#e6ecff" />
+          </>
+        )}
       </svg>
       <div className="mt-1 text-center">
         <motion.div className="text-5xl font-semibold tabular-nums" style={{ color }}>
