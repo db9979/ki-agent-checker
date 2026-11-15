@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from . import __version__, mcp, providers, report, scanners, skills
 from . import attacks as attack_lib
+from . import compare as compare_lib
 from .demo import run_demo
 from .events import EventHub
 from .keystore import SecretStore
@@ -339,6 +340,13 @@ def create_app(
     @app.get("/runs", dependencies=protected)
     def list_runs() -> list[RunSummary]:
         return store.list_runs()
+
+    @app.get("/runs/compare", dependencies=protected)
+    def compare_runs(a: str, b: str) -> dict:
+        run_a, run_b = store.get_run(a), store.get_run(b)
+        if not run_a or not run_b:
+            raise HTTPException(404, "Lauf nicht gefunden")
+        return compare_lib.compare(run_a, store.get_run_log(a), run_b, store.get_run_log(b))
 
     @app.get("/runs/{run_id}/events", dependencies=protected)
     def run_events(run_id: str) -> list[dict]:

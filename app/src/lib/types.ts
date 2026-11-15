@@ -143,3 +143,32 @@ export interface Skill {
   payload_count: number;
   module_key: string | null;
 }
+
+export type CompareStatus = "neu" | "schlechter" | "behoben" | "besser" | "neu_getestet" | "entfallen" | "gleich";
+
+export interface CompareSide {
+  rate: number;
+  hits: number;
+  attempts: number;
+}
+
+export interface CompareRow {
+  module: string;
+  label: string;
+  title: string | null;
+  owasp: string;
+  severity: Severity;
+  a: CompareSide | null;
+  b: CompareSide | null;
+  status: CompareStatus;
+}
+
+export interface CompareResult {
+  a: Omit<RunSummary, "findings">;
+  b: Omit<RunSummary, "findings">;
+  same_target: boolean;
+  delta: number | null;
+  counts: Record<CompareStatus, number>;
+  rows: CompareRow[];
+  complete: boolean;
+}
