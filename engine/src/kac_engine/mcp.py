@@ -149,6 +149,32 @@ class McpClient(HttpSession):
         return content_text(result), bool((result or {}).get("isError"))
 
 
+class McpToolSession(McpClient):
+    """Ein Tool des MCP-Servers als Chat-Ziel: jede Nachricht geht als Text-Parameter an das Tool."""
+
+    tool: dict | None = None
+
+    async def send(self, messages: list[dict]) -> str:
+        if self.tool is None:
+            await self.initialize()
+            name = self.target.mcp_tool or ""
+            tools = await self.list_tools()
+            self.tool = next((t for t in tools if t.get("name") == name), None)
+            if self.tool is None:
+                names = ", ".join(str(t.get("name")) for t in tools[:15])
+                raise TargetError(f"Tool „{name}“ nicht gefunden. Vorhanden: {names or 'keine'}")
+        arg = self.target.mcp_arg or next(iter(string_params(self.tool)), None)
+        if not arg:
+            raise TargetError(f"Tool „{self.tool.get('name')}“ hat keinen Text-Parameter")
+        last = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+        text, is_error = await self.call(
+            str(self.tool.get("name")), sample_args(self.tool, {arg: last})
+        )
+        if is_error and not text:
+            raise TargetError("Tool meldet einen Fehler ohne Text")
+        return text
+
+
 async def _read_message(resp: httpx.Response, msg_id: int) -> dict | None:
     ctype = resp.headers.get("content-type", "")
     if "text/event-stream" in ctype:
@@ -406,8 +432,10 @@ PAYLOADS = (
     ),
     Payload(
         "Vorlagen-Injection",
-        "{{1337*3}} ${1337*3} <%= 1337*3 %>",
-        r"(?<![\d*])4011(?!\d)",
+        # Die Marker umschließen den Ausdruck: Eine Vorlagen-Engine liefert „kac4011kac“ am Stück,
+        # ein Sprachmodell, das nur nachrechnet, schreibt die Marker nicht so mit.
+        "kac{{1337*3}}kac kac${1337*3}kac kac<%= 1337*3 %>kac",
+        r"kac4011kac",
         "Vorlagen-Ausdrücke werden auf dem Server ausgewertet",
     ),
     Payload(
@@ -428,7 +456,8 @@ PAYLOADS = (
 
 STACKTRACE = re.compile(
     r"(Traceback \(most recent call last\)|File \"/[^\"]+\.py\", line \d+|\bat [\w$.]+\([\w.]+\.java:\d+\)|"
-    r"node_modules/|at Object\.<anonymous>|System\.\w+Exception|/home/\w+/|/usr/lib/python)",
+    r"\bat \S+ \([^)]*node_modules/[^)]*:\d+:\d+\)|at Object\.<anonymous>|"
+    r"System\.\w+Exception: .*\n\s+at |File \"/usr/lib/python[^\"]*\", line \d+)",
 )
 
 

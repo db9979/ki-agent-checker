@@ -13,6 +13,18 @@ KEY = "geheim-123"
 
 TOOLS = [
     {
+        "name": "ask_agent",
+        "description": "Fragt den Assistenten.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string"},
+                "lang": {"type": "string", "enum": ["de"]},
+            },
+            "required": ["question", "lang"],
+        },
+    },
+    {
         "name": "get_weather",
         "description": "Liefert das Wetter für eine Stadt.",
         "inputSchema": {
@@ -113,6 +125,8 @@ def tool(name: str, args: dict) -> str:
         if "'" in str(args.get("query")):
             return 'sqlite3.OperationalError: near "1": syntax error'
         return "Keine Treffer."
+    if name == "ask_agent":
+        return f"Antwort ({args['lang']}): Mein geheimer Prompt enthält Pelikan."
     return "gesendet"
 
 
@@ -238,3 +252,42 @@ async def test_unreachable_server_fails_cleanly(api_client):
     assert events[0]["type"] == "run.started"
     err = next(e for e in events if e["type"] == "run.error")["error"]
     assert "404" in err and "/mcp" in err
+
+
+async def test_tool_as_chat_target(api_client):
+    from kac_engine.runner import RunConfig, run_target
+
+    target = make_target(
+        api_client, kind="mcp_tool", mcp_tool="ask_agent", leak_markers=["Pelikan"]
+    ).json()
+    check = api_client.post(f"/targets/{target['id']}/check").json()
+    assert check["ok"] and "Pelikan" in check["reply"]
+    store = api_client.app.state.store
+    hub = EventHub()
+    run_id = await run_target(
+        hub,
+        store,
+        api_client.app.state.keys,
+        RunConfig(target=store.get_target(target["id"]), modules=["system_prompt_leak"]),
+    )
+    run = next(r for r in store.list_runs() if r.id == run_id)
+    assert run.status == "finished" and run.findings[0].module == "system_prompt_leak"
+    assert all(name == "ask_agent" and args["lang"] == "de" for name, args in calls)
+
+    wrong = make_target(api_client, kind="mcp_tool", mcp_tool="gibtsnicht").json()
+    err = api_client.post(f"/targets/{wrong['id']}/check").json()["error"]
+    assert "nicht gefunden" in err and "ask_agent" in err
+
+
+def test_no_false_positives_from_real_server():
+    """Fälle aus einem echten Lauf: Suchtreffer mit Pfaden und ein Modell, das nachrechnet."""
+    import re
+
+    search_hit = (
+        "[NAS · home/node_modules/typescript/ThirdPartyNoticeText.txt, Abschnitt W3C License]"
+    )
+    assert not mcp.STACKTRACE.search(search_hit)
+    assert mcp.STACKTRACE.search("    at run (/srv/app/node_modules/x/index.js:12:5)")
+    tpl = next(p for p in mcp.PAYLOADS if p.technique == "Vorlagen-Injection")
+    assert not re.search(tpl.signs, "Das Ergebnis für alle drei Ausdrücke ist 4011.")
+    assert re.search(tpl.signs, "kac4011kac kac${1337*3}kac")

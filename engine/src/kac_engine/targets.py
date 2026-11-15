@@ -43,6 +43,9 @@ class TargetKind(StrEnum):
     OPENAI_ENDPOINT = "openai_endpoint"
     HTTP = "http"
     MCP = "mcp"
+    MCP_TOOL = (
+        "mcp_tool"  # ein einzelnes Tool eines MCP-Servers wird wie ein Chat-Agent angegriffen
+    )
 
 
 class AuthKind(StrEnum):
@@ -129,6 +132,10 @@ class TargetIn(BaseModel):
         description="Texte aus dem System-Prompt, die nie in einer Antwort auftauchen dürfen",
     )
     delay: float = Field(default=0.5, ge=0, le=30, description="Pause zwischen Anfragen")
+    mcp_tool: str | None = Field(default=None, description="Tool, das als Chat-Ziel dient")
+    mcp_arg: str | None = Field(
+        default=None, description="Parameter für die Nachricht; leer = erster Text-Parameter"
+    )
     mcp_tool_calls: Literal["none", "readonly", "all"] = Field(
         default="readonly",
         description="Welche Tools eines MCP-Servers beim Audit aufgerufen werden dürfen",
@@ -154,6 +161,8 @@ class Target(BaseModel):
     leak_markers: list[str] = Field(default_factory=list)
     delay: float = 0.5
     mcp_tool_calls: Literal["none", "readonly", "all"] = "readonly"
+    mcp_tool: str | None = None
+    mcp_arg: str | None = None
     created_at: datetime
 
     def describe(self) -> str:

@@ -21,7 +21,7 @@ import { useApi } from "../lib/useApi";
 
 const input = "w-full rounded-lg border border-line bg-[#0b1222] px-3 py-2 text-sm outline-none focus:border-cyan";
 
-const KIND_ICON = { model: Bot, openai_endpoint: Plug, http: Globe, mcp: Server } as const;
+const KIND_ICON = { model: Bot, openai_endpoint: Plug, http: Globe, mcp: Server, mcp_tool: Server } as const;
 
 function CodeInputs({
   names,
