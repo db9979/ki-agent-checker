@@ -3,6 +3,7 @@ import { Play, ShieldAlert } from "lucide-react";
 import { useMemo } from "react";
 import { ModuleRadar, TrendChart } from "../components/Charts";
 import { Heatmap, type HeatRow } from "../components/Heatmap";
+import { ReportButton } from "../components/ReportButton";
 import { ScoreGauge } from "../components/ScoreGauge";
 import { SeverityBars } from "../components/SeverityBars";
 import { MODULES } from "../lib/modules";
@@ -19,6 +20,11 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
   const finished = (runs ?? []).filter((r) => r.status === "finished");
   const last = finished.at(-1) ?? null;
   const live = run.status !== "idle";
+  const reportId = live ? (run.status === "finished" ? run.runId : null) : (last?.id ?? null);
+  const history = (runs ?? [])
+    .filter((r) => r.status !== "running")
+    .slice(-8)
+    .reverse();
 
   const score = live ? liveScore(run) : (last?.score ?? null);
   const findings: Finding[] = live ? run.findings : (last?.findings ?? []);
@@ -48,13 +54,16 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
           <h1 className="text-2xl font-semibold">Dashboard</h1>
           <p className="text-sm text-muted">{live ? run.target : last ? last.target : "Noch kein Testlauf"}</p>
         </div>
-        <button
-          onClick={onStartDemo}
-          disabled={run.status === "running"}
-          className="glow-cyan flex items-center gap-2 rounded-xl bg-cyan/15 px-4 py-2 text-sm font-medium text-cyan transition hover:bg-cyan/25 disabled:opacity-40"
-        >
-          <Play size={16} /> Demo-Lauf starten
-        </button>
+        <div className="flex items-start gap-2">
+          {reportId && <ReportButton runId={reportId} />}
+          <button
+            onClick={onStartDemo}
+            disabled={run.status === "running"}
+            className="glow-cyan flex items-center gap-2 rounded-xl bg-cyan/15 px-4 py-2 text-sm font-medium text-cyan transition hover:bg-cyan/25 disabled:opacity-40"
+          >
+            <Play size={16} /> Demo-Lauf starten
+          </button>
+        </div>
       </header>
 
       <section className="panel col-span-12 flex flex-col items-center justify-center p-5 md:col-span-4">
@@ -100,6 +109,27 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
           <TrendChart data={trend} />
         </div>
       </section>
+
+      {history.length > 0 && (
+        <section className="panel col-span-12 p-5">
+          <h2 className="mb-3 text-sm font-semibold text-muted">Letzte Läufe</h2>
+          <div className="divide-y divide-line text-xs">
+            {history.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 py-1.5">
+                <span className="w-32 shrink-0 tabular-nums text-muted">
+                  {new Date(r.started_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{r.target}</span>
+                <span className="text-muted">{r.findings.length} Befunde</span>
+                <span className="w-16 text-right font-mono tabular-nums">
+                  {r.status === "finished" ? (r.score ?? "–") : r.status === "failed" ? "Fehler" : "abgebr."}
+                </span>
+                <ReportButton runId={r.id} compact />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="panel col-span-12 p-5">
         <h2 className="mb-3 text-sm font-semibold text-muted">Findings und Gegenmaßnahmen</h2>

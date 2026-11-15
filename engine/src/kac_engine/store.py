@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS targets (
     config TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS run_logs (
+    run_id TEXT PRIMARY KEY,
+    log TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS skills (
     name TEXT PRIMARY KEY,
     config TEXT NOT NULL
@@ -252,6 +256,22 @@ class Store:
             )
             for r in rows
         ]
+
+    def get_run(self, run_id: str) -> RunSummary | None:
+        return next((r for r in self.list_runs() if r.id == run_id), None)
+
+    def save_run_log(self, run_id: str, log: list[dict]) -> None:
+        """Ergebnis jedes einzelnen Angriffs, damit Berichte auch nach einem Neustart vollständig sind."""
+        with self._lock:
+            self._db.execute(
+                "INSERT OR REPLACE INTO run_logs VALUES (?, ?)",
+                (run_id, json.dumps(log, ensure_ascii=False)),
+            )
+            self._db.commit()
+
+    def get_run_log(self, run_id: str) -> list[dict]:
+        row = self._db.execute("SELECT log FROM run_logs WHERE run_id = ?", (run_id,)).fetchone()
+        return json.loads(row["log"]) if row else []
 
     # Ziele -----------------------------------------------------------------
     def save_target(self, target: Target) -> None:

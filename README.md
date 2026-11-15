@@ -81,6 +81,12 @@ In der Standardsammlung enthält derzeit nur „Testing for System Prompt Leakag
 
 ![Skills](docs/screenshots/skills.png)
 
+### Bericht exportieren
+
+Im Dashboard erzeugt **Bericht** für den letzten Lauf (oder unter „Letzte Läufe“ für jeden früheren) eine eigenständige HTML-Datei im Download-Ordner und öffnet sie im Browser. Dort speichert „Als PDF speichern“ den Bericht als PDF. Inhalt: Score, Zusammenfassung, Ergebnis je Modul, Befunde mit Beleg und Gegenmaßnahme (plus passende importierte Skills), Anhang mit allen Angriffen sowie Umfang und Freigabe des Projekts.
+
+![Bericht](docs/screenshots/bericht.png)
+
 ## Aufbau
 
 ```
