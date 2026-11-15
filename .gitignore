@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+engine/build/
+engine/dist/
+*.spec
+
+# Node / Frontend
+node_modules/
+app/dist/
+
+# Tauri
+app/src-tauri/target/
+app/src-tauri/binaries/
+app/src-tauri/gen/
+
+# Lokale Daten
+*.sqlite3
+.DS_Store
+*.tsbuildinfo
