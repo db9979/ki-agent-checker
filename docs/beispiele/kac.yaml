@@ -3,24 +3,24 @@
 fail_on: high            # info, low, medium, high, critical oder never
 
 project:
-  name: Spark
-  scope: [speech.metaluna9.i234.me]
+  name: Mein MCP-Server
+  scope: [mcp.example.com]
   authorization_confirmed: true   # Pflicht: Du darfst dieses System testen
-  authorized_by: Dominik
+  authorized_by: Max Mustermann
 
 target:
-  name: spark
+  name: mein-server
   kind: mcp               # model, openai_endpoint, http, mcp oder mcp_tool
-  url: https://speech.metaluna9.i234.me/mcp
+  url: https://mcp.example.com/mcp
   mcp_tool_calls: readonly
   auth:
     kind: bearer
   accounts:
     - name: ci
-      token: ${SPARK_TOKEN}
+      token: ${MCP_TOKEN}
 
 # Für kind: mcp_tool (ein Tool als Chat-Ziel):
-#   mcp_tool: ask_spark
+#   mcp_tool: frage_stellen
 
 # Optional: eigene Modelle, z. B. als Richter
 # providers:

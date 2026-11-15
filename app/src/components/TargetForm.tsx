@@ -289,7 +289,7 @@ export function TargetForm({
                   className={`${input} font-mono`}
                   value={mcpTool}
                   onChange={(e) => setMcpTool(e.target.value)}
-                  placeholder="z. B. ask_spark"
+                  placeholder="z. B. frage_stellen"
                 />
               </label>
               <label className="block text-xs text-muted">
