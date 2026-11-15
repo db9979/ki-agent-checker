@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
-import { Play, Square, XCircle } from "lucide-react";
+import { Loader2, Play, Square, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AttackPath } from "../components/AttackPath";
 import { ReplayBar } from "../components/hud/ReplayBar";
 import { Terminal } from "../components/Terminal";
 import { api } from "../lib/engine";
-import { liveScore, useRun } from "../lib/runStore";
+import { liveScore, type ScannerStatus, useRun } from "../lib/runStore";
 import { useEffectsMode } from "../lib/settings";
 
 function Stat({ value, label, color }: { value: number | string; label: string; color?: string }) {
@@ -86,6 +86,8 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
         </div>
       )}
 
+      {run.scanner && run.status === "running" && <ScannerBar s={run.scanner} />}
+
       <section className="panel min-h-0 flex-[3] overflow-hidden">
         <AttackPath attacks={run.attacks} selected={current?.id ?? null} onSelect={setSelected} full={full} />
       </section>
@@ -94,6 +96,7 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
         <div className="hud-scanlines absolute inset-0 opacity-40" />
         <Terminal
           attack={current}
+          scanner={run.status === "running" ? run.scanner : null}
           index={index}
           total={run.total}
           live={run.status === "running" && selected === null}
@@ -112,6 +115,35 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
       <div className="shrink-0">
         <ReplayBar />
       </div>
+    </div>
+  );
+}
+
+function ScannerBar({ s }: { s: ScannerStatus }) {
+  const min = Math.floor(s.elapsed / 60);
+  const sec = String(s.elapsed % 60).padStart(2, "0");
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-cyan/30 bg-cyan/5 px-4 py-2 text-xs">
+      <span className="flex items-center gap-2 font-semibold text-cyan">
+        <Loader2 size={14} className="animate-spin" /> {s.tool} läuft
+      </span>
+      <span className="min-w-0 flex-1 truncate font-mono text-muted" title={s.phase}>
+        {s.phase}
+      </span>
+      <span className="tabular-nums">
+        <b>{s.requests}</b> Anfragen ans Ziel
+      </span>
+      {s.errors > 0 && (
+        <span className="tabular-nums text-red">
+          <b>{s.errors}</b> Fehler
+        </span>
+      )}
+      <span className="tabular-nums">
+        <b>{s.results}</b> ausgewertet
+      </span>
+      <span className="font-mono tabular-nums text-muted">
+        {min}:{sec}
+      </span>
     </div>
   );
 }

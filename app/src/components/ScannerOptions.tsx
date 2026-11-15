@@ -10,6 +10,7 @@ export interface ScannerSettings {
   probes: string;
   purpose: string;
   num_tests: number;
+  max_prompts: number;
 }
 
 const DEFAULTS: Record<ScannerTool, Omit<ScannerSettings, "tool">> = {
@@ -18,8 +19,9 @@ const DEFAULTS: Record<ScannerTool, Omit<ScannerSettings, "tool">> = {
     probes: "promptinject,dan.DanInTheWild,encoding.InjectBase64,leakreplay,latentinjection,xss",
     purpose: "",
     num_tests: 3,
+    max_prompts: 20,
   },
-  promptfoo: { cmd: "npx -y promptfoo@latest", probes: "owasp:llm", purpose: "", num_tests: 3 },
+  promptfoo: { cmd: "npx -y promptfoo@latest", probes: "owasp:llm", purpose: "", num_tests: 3, max_prompts: 20 },
 };
 
 const small =
@@ -81,10 +83,25 @@ export function ScannerOptions({
           {check.ok ? `Gefunden: ${check.version || value.tool}` : check.error}
         </p>
       )}
-      <label className="block">
-        {garak ? "Probes (Komma-getrennt)" : "Plugins oder Preset (z. B. owasp:llm)"}
-        <input className={`${small} mt-1`} value={value.probes} onChange={(e) => set({ probes: e.target.value })} />
-      </label>
+      <div className={garak ? "grid grid-cols-4 gap-1" : ""}>
+        <label className={garak ? "col-span-3 block" : "block"}>
+          {garak ? "Probes (Komma-getrennt)" : "Plugins oder Preset (z. B. owasp:llm)"}
+          <input className={`${small} mt-1`} value={value.probes} onChange={(e) => set({ probes: e.target.value })} />
+        </label>
+        {garak && (
+          <label className="block" title="garak schickt sonst bis zu 256 Prompts je Probe">
+            Prompts je Probe
+            <input
+              type="number"
+              min={1}
+              max={256}
+              className={`${small} mt-1`}
+              value={value.max_prompts}
+              onChange={(e) => set({ max_prompts: Math.min(256, Math.max(1, Number(e.target.value) || 1)) })}
+            />
+          </label>
+        )}
+      </div>
       {!garak && (
         <div className="grid grid-cols-4 gap-1">
           <label className="col-span-3 block">

@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef } from "react";
 import { LAYERS, pathOf } from "../lib/depth";
-import type { Attack, Message } from "../lib/runStore";
+import type { Attack, Message, ScannerStatus } from "../lib/runStore";
 import { Typewriter } from "./hud/Typewriter";
 
 const ROLE = {
@@ -51,12 +51,14 @@ function Line({ m, live, full }: { m: Message; live: boolean; full: boolean }) {
 /** Gesprächsprotokoll eines Angriffs im Terminal-Stil. */
 export function Terminal({
   attack,
+  scanner = null,
   index,
   total,
   live,
   full,
 }: {
   attack: Attack | undefined;
+  scanner?: ScannerStatus | null;
   index: number;
   total: number;
   live: boolean;
@@ -67,6 +69,24 @@ export function Terminal({
     body.current?.scrollTo({ top: body.current.scrollHeight, behavior: "smooth" });
   }, [attack?.messages.length, attack?.id]);
 
+  if (!attack && scanner) {
+    // Externe Scanner werten erst nach jeder Probe aus; bis dahin den Verkehr über die Brücke zeigen
+    return (
+      <div className="relative h-full overflow-y-auto p-4 font-mono text-[13px]">
+        <div className="mb-3 text-[11px] uppercase tracking-wider text-muted">
+          {scanner.tool} · noch keine Auswertung, die erscheint nach jeder Probe
+        </div>
+        {scanner.prompt ? (
+          <>
+            <Line m={{ role: "attacker", text: scanner.prompt }} live={false} full={false} />
+            <Line m={{ role: "target", text: scanner.reply || "(keine Antwort)" }} live={false} full={false} />
+          </>
+        ) : (
+          <span className="hud-caret text-muted">{scanner.phase}</span>
+        )}
+      </div>
+    );
+  }
   if (!attack) {
     return (
       <div className="flex h-full items-center justify-center font-mono text-sm text-muted">
