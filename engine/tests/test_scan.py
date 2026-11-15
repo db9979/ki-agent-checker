@@ -108,7 +108,9 @@ def test_config_errors(cfg_file, tmp_path, monkeypatch, capsys):
     assert scan.run_scan(args(config=str(cfg_file))) == scan.EXIT_ERROR
     assert "BOT_TOKEN" in capsys.readouterr().err
     bad = tmp_path / "bad.yaml"
-    bad.write_text(CONFIG.replace("authorization_confirmed: true", "authorization_confirmed: false"))
+    bad.write_text(
+        CONFIG.replace("authorization_confirmed: true", "authorization_confirmed: false")
+    )
     monkeypatch.setenv("BOT_TOKEN", "x")
     assert scan.run_scan(args(config=str(bad))) == scan.EXIT_ERROR
     assert "Berechtigung" in capsys.readouterr().err
