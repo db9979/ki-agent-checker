@@ -25,6 +25,7 @@ export function Models() {
   const [model, setModel] = useState("");
   const [url, setUrl] = useState(p.url);
   const [key, setKey] = useState("");
+  const [trustSelfSigned, setTrustSelfSigned] = useState(true);
   const [found, setFound] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, ConnectionResult>>({});
@@ -41,7 +42,7 @@ export function Models() {
     setMessage(null);
     const res = await api<{ ok: boolean; models: string[]; error?: string }>("/providers/discover", {
       method: "POST",
-      body: JSON.stringify({ kind: p.kind, base_url: url || null, api_key: key || null }),
+      body: JSON.stringify({ kind: p.kind, base_url: url || null, api_key: key || null, verify_tls: !(p.local && trustSelfSigned) }),
     });
     setBusy(null);
     setFound(res.models);
@@ -61,6 +62,7 @@ export function Models() {
           model,
           base_url: url || null,
           api_key: key || null,
+          verify_tls: !(p.local && trustSelfSigned),
         }),
       });
       setName("");
@@ -110,10 +112,16 @@ export function Models() {
           ))}
         </div>
         {p.local && (
-          <label className="block text-xs text-muted">
-            Server-Adresse
-            <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} />
-          </label>
+          <>
+            <label className="block text-xs text-muted">
+              Server-Adresse
+              <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-muted">
+              <input type="checkbox" checked={trustSelfSigned} onChange={(e) => setTrustSelfSigned(e.target.checked)} />
+              Selbst signierten Zertifikaten vertrauen (Server im Heimnetz)
+            </label>
+          </>
         )}
         <label className="block text-xs text-muted">
           API-Schlüssel {p.needsKey ? "" : "(optional)"}
@@ -171,6 +179,7 @@ export function Models() {
                     <div className="font-mono text-[11px] text-muted">
                       {pr.kind}/{pr.model} {pr.base_url ? `· ${pr.base_url}` : ""}
                     </div>
+                    {!pr.verify_tls && <div className="mt-0.5 text-[10px] text-amber">vertraut selbst signierten Zertifikaten</div>}
                   </div>
                   <button onClick={() => test(pr.id)} className="rounded-lg border border-line px-3 py-1.5 text-xs hover:border-cyan">
                     {busy === pr.id ? <Loader2 size={13} className="animate-spin" /> : "Testen"}

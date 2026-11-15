@@ -39,6 +39,7 @@ class DiscoverIn(BaseModel):
     kind: ProviderKind
     base_url: str | None = None
     api_key: str | None = None
+    verify_tls: bool = True
 
 
 class DemoRunIn(BaseModel):
@@ -114,9 +115,11 @@ def create_app(
     @app.post("/providers/discover", dependencies=protected)
     async def discover(data: DiscoverIn) -> dict:
         try:
-            models = await providers.discover_models(data.kind, data.base_url, data.api_key)
+            models = await providers.discover_models(
+                data.kind, data.base_url, data.api_key, data.verify_tls
+            )
         except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "models": [], "error": f"{type(exc).__name__}: {exc}"[:300]}
+            return {"ok": False, "models": [], "error": providers.describe_error(exc)}
         return {"ok": True, "models": models}
 
     # Projekte ------------------------------------------------------------

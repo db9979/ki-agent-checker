@@ -28,6 +28,9 @@ class ProviderIn(BaseModel):
     model: str = Field(min_length=1, max_length=200)
     base_url: HttpUrl | None = None
     api_key: str | None = Field(default=None, description="Wird im Schlüsselbund gespeichert")
+    verify_tls: bool = Field(
+        default=True, description="False: auch selbst signierten Zertifikaten vertrauen"
+    )
 
 
 class Provider(BaseModel):
@@ -38,6 +41,7 @@ class Provider(BaseModel):
     base_url: str | None = None
     has_api_key: bool = False
     self_hosted: bool = False
+    verify_tls: bool = True
     created_at: datetime
 
 
