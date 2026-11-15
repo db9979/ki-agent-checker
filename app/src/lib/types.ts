@@ -100,6 +100,7 @@ export interface Target {
   honeypot_tools: boolean;
   url: string | null;
   model: string | null;
+  method: "POST" | "PUT" | "GET";
   request_template: string;
   response_path: string;
   verify_tls: boolean;

@@ -106,7 +106,18 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
   );
 }
 
-function TargetRow({ t, onDeleted, onRunStarted }: { t: Target; onDeleted: () => void; onRunStarted: () => void }) {
+function TargetRow({
+  t,
+  project,
+  onChanged,
+  onRunStarted,
+}: {
+  t: Target;
+  project: Project;
+  onChanged: () => void;
+  onRunStarted: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
   const [check, setCheck] = useState<ConnectionResult | "busy" | null>(null);
   const [running, setRunning] = useState(false);
   const Icon = KIND_ICON[t.kind];
@@ -116,7 +127,7 @@ function TargetRow({ t, onDeleted, onRunStarted }: { t: Target; onDeleted: () =>
   };
   const remove = async () => {
     await api(`/targets/${t.id}`, { method: "DELETE" });
-    onDeleted();
+    onChanged();
   };
   return (
     <div className="rounded-lg border border-line bg-[#0b1222]/70 p-2.5">
@@ -133,6 +144,12 @@ function TargetRow({ t, onDeleted, onRunStarted }: { t: Target; onDeleted: () =>
             className="rounded-md bg-red/15 px-2 py-0.5 text-[11px] text-red"
           >
             Testen
+          </button>
+          <button
+            onClick={() => setEditing(!editing)}
+            className={`rounded-md px-2 py-0.5 text-[11px] ${editing ? "bg-cyan/15 text-cyan" : "bg-panel-2 text-muted hover:text-text"}`}
+          >
+            Bearbeiten
           </button>
           <button onClick={remove} className="px-1 text-muted hover:text-red" title="Ziel löschen">
             <Trash2 size={12} />
@@ -162,6 +179,19 @@ function TargetRow({ t, onDeleted, onRunStarted }: { t: Target; onDeleted: () =>
         </div>
       )}
       {running && <RunPanel target={t} onStarted={onRunStarted} onClose={() => setRunning(false)} />}
+      {editing && (
+        <div className="mt-3 rounded-xl border border-cyan/30 bg-[#080d19] p-3">
+          <TargetForm
+            project={project}
+            initial={t}
+            onSaved={() => {
+              setEditing(false);
+              setCheck(null);
+              onChanged();
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -193,7 +223,7 @@ function ProjectCard({ p, onRunStarted }: { p: Project; onRunStarted: () => void
       </div>
       <div className="mt-3 space-y-2">
         {targets?.map((t) => (
-          <TargetRow key={t.id} t={t} onDeleted={reload} onRunStarted={onRunStarted} />
+          <TargetRow key={t.id} t={t} project={p} onChanged={reload} onRunStarted={onRunStarted} />
         ))}
       </div>
       {adding && (

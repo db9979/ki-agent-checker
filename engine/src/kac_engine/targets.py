@@ -27,8 +27,8 @@ import struct
 import time
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
-from urllib.parse import urlparse
+from typing import Any, Literal
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from pydantic import BaseModel, Field
@@ -100,6 +100,7 @@ class TargetIn(BaseModel):
     # openai_endpoint / http
     url: str | None = None
     model: str | None = None
+    method: Literal["POST", "PUT", "GET"] = "POST"
     request_template: str = '{"message": "{{message}}"}'
     response_path: str = "reply"
     verify_tls: bool = True
@@ -122,6 +123,7 @@ class Target(BaseModel):
     honeypot_tools: bool = True
     url: str | None = None
     model: str | None = None
+    method: Literal["POST", "PUT", "GET"] = "POST"
     request_template: str = '{"message": "{{message}}"}'
     response_path: str = "reply"
     verify_tls: bool = True
@@ -291,8 +293,51 @@ class HttpSession:
                 continue
             break
         if resp.status_code >= 400:
-            raise TargetError(f"Ziel antwortet mit HTTP {resp.status_code}: {resp.text[:200]}")
+            hint = await self._hint(resp.status_code)
+            raise TargetError(
+                f"Ziel antwortet mit HTTP {resp.status_code}: {resp.text[:200]}"
+                + (f". {hint}" if hint else "")
+            )
         return self._extract(resp)
+
+    async def _hint(self, status: int) -> str:
+        """Bei 404/405 nach passenden Endpunkten suchen (OpenAPI-Beschreibung des Servers)."""
+        if status == 401 or status == 403:
+            return "Tipp: Anmeldung prüfen (Anmeldeart, Benutzername, Passwort oder Token)"
+        if status not in (404, 405):
+            return ""
+        base = self.target.url or ""
+        found: list[str] = []
+        for doc in ("/openapi.json", "/api/openapi.json", "/swagger.json", "/v1/openapi.json"):
+            try:
+                resp = await self.client.get(urljoin(base, doc), headers=self.headers, timeout=10)
+                spec = resp.json() if resp.status_code == 200 else None
+            except (httpx.HTTPError, ValueError):
+                spec = None
+            if isinstance(spec, dict) and isinstance(spec.get("paths"), dict):
+                for path, ops in spec["paths"].items():
+                    if isinstance(ops, dict) and ("post" in ops or "put" in ops):
+                        found.append(path)
+                break
+        what = (
+            "die Methode passt nicht zur Adresse"
+            if status == 405
+            else "unter dieser Adresse gibt es keinen Endpunkt"
+        )
+        if found:
+            likely = sorted(
+                found,
+                key=lambda p: (
+                    not re.search(
+                        r"chat|message|ask|query|complet|prompt|talk|speak|conversation", p, re.I
+                    )
+                ),
+            )[:6]
+            return f"Tipp: {what}. Der Server bietet u. a. diese Endpunkte an: {', '.join(likely)}"
+        return (
+            f"Tipp: {what}. Die Adresse muss auf den Chat-Endpunkt zeigen, z. B. …/api/chat statt der Startseite, "
+            "und die Methode (meist POST) muss stimmen"
+        )
 
     async def _post(self, messages: list[dict]) -> httpx.Response:
         t = self.target
@@ -303,9 +348,11 @@ class HttpSession:
             payload = {"model": t.model or "default", "messages": messages}
             return await self.client.post(url, json=payload, headers=self.headers)
         last = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+        if t.method == "GET":
+            return await self.client.get(url, params={"message": last}, headers=self.headers)
         body = render(t.request_template, {"message": last, "messages": messages})
         headers = {"Content-Type": "application/json", **self.headers}
-        return await self.client.post(url, content=body, headers=headers)
+        return await self.client.request(t.method, url, content=body, headers=headers)
 
     def _extract(self, resp: httpx.Response) -> str:
         if self.target.kind == TargetKind.OPENAI_ENDPOINT:

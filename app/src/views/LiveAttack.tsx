@@ -44,13 +44,13 @@ function Bubble({ m }: { m: Message }) {
       initial={{ opacity: 0, y: 12, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 260, damping: 24 }}
-      className={`${r.align} max-w-[88%]`}
+      className={`${r.align} min-w-0 max-w-[88%]`}
     >
       <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium" style={{ color: r.color }}>
         <Icon size={13} /> {r.label}
       </div>
       <div
-        className="rounded-2xl border px-4 py-2.5 text-sm leading-relaxed"
+        className="rounded-2xl border px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]"
         style={{ borderColor: `${r.color}44`, background: `${r.color}12` }}
       >
         {highlight(m.text)}
@@ -60,7 +60,7 @@ function Bubble({ m }: { m: Message }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: [0, 1, 0.6, 1] }}
           transition={{ duration: 1 }}
-          className="glow-red mt-2 flex items-center gap-2 rounded-xl border border-red/50 bg-red/10 px-3 py-2 font-mono text-xs text-red"
+          className="glow-red mt-2 flex items-start gap-2 rounded-xl border border-red/50 bg-red/10 px-3 py-2 font-mono text-xs text-red [overflow-wrap:anywhere]"
         >
           <Siren size={14} />
           Honeypot-Tool: {m.tool_call.name}({JSON.stringify(m.tool_call.args)})

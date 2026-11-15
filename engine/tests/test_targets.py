@@ -225,3 +225,69 @@ async def test_model_target_detects_honeypot_and_canary(monkeypatch):
     assert {f.module for f in run.findings} == {"excessive_agency", "system_prompt_leak"}
     tool_msgs = [e for e in hub.history(run_id) if e["type"] == "message" and e.get("tool_call")]
     assert tool_msgs[0]["tool_call"]["name"] == "refund"
+
+
+def test_update_target_keeps_secrets(api_client):
+    created = make_target(api_client).json()
+    body = {
+        "project_id": created["project_id"],
+        "name": "ShopBot neu",
+        "kind": "http",
+        "url": "https://bot.example/chat",
+        "delay": 0,
+        "auth": {
+            "kind": "login",
+            "login_url": "https://bot.example/login",
+            "token_path": "data.token",
+        },
+        "accounts": [{"name": "anna", "username": "anna"}],  # Passwort leer = bleibt
+    }
+    resp = api_client.put(f"/targets/{created['id']}", json=body)
+    assert resp.status_code == 200
+    target = resp.json()
+    assert target["name"] == "ShopBot neu" and target["created_at"] == created["created_at"]
+    assert [a["name"] for a in target["accounts"]] == ["anna"]
+    assert target["accounts"][0]["has_password"] is True
+    keys = api_client.app.state.keys
+    assert keys.get(f"target:{created['id']}:ben:password") is None
+    assert api_client.post(f"/targets/{created['id']}/check").json()["ok"]
+
+    bad = api_client.put(
+        f"/targets/{created['id']}", json={**body, "url": "https://other.example/x"}
+    )
+    assert bad.status_code == 403
+
+
+def test_wrong_path_suggests_endpoints(monkeypatch):
+    import asyncio
+    from datetime import UTC, datetime
+
+    from kac_engine.targets import Target, TargetError
+
+    def server(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/openapi.json":
+            return httpx.Response(
+                200, json={"paths": {"/health": {"get": {}}, "/api/speak": {"post": {}}}}
+            )
+        return httpx.Response(405, json={"detail": "Method Not Allowed"})
+
+    monkeypatch.setattr(HttpSession, "transport", httpx.MockTransport(server))
+    target = Target(
+        id="t",
+        project_id="p",
+        name="x",
+        kind="http",
+        url="https://speech.example",
+        created_at=datetime.now(UTC),
+    )
+
+    async def go():
+        session = HttpSession(target, None, {})
+        try:
+            await session.send([{"role": "user", "content": "hi"}])
+        finally:
+            await session.close()
+
+    with pytest.raises(TargetError) as err:
+        asyncio.run(go())
+    assert "/api/speak" in str(err.value) and "/health" not in str(err.value)

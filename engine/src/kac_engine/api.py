@@ -164,8 +164,7 @@ def create_app(
     def list_targets(project_id: str | None = None) -> list[Target]:
         return store.list_targets(project_id)
 
-    @app.post("/targets", dependencies=protected, status_code=201)
-    def add_target(data: TargetIn) -> Target:
+    def _validate(data: TargetIn) -> Project:
         project = store.get_project(data.project_id)
         if not project:
             raise HTTPException(404, "Projekt nicht gefunden")
@@ -184,29 +183,45 @@ def create_app(
         names = [a.name for a in data.accounts]
         if len(names) != len(set(names)):
             raise HTTPException(422, "Testkonten brauchen eindeutige Namen")
-        target = Target(
-            id=uuid.uuid4().hex[:12],
-            created_at=datetime.now(UTC),
-            accounts=[
+        return project
+
+    def _build(data: TargetIn, target_id: str, created_at: datetime, old: Target | None) -> Target:
+        """Erzeugt das Ziel. Leere Geheimnis-Felder behalten beim Bearbeiten den alten Wert."""
+        previous = {a.name: a for a in (old.accounts if old else [])}
+        accounts = []
+        for a in data.accounts:
+            prev = previous.get(a.name)
+            for field in SECRET_FIELDS:
+                value = getattr(a, field)
+                if value:
+                    keys.set(secret_key(target_id, a.name, field), value)
+            accounts.append(
                 Account(
                     name=a.name,
                     role=a.role,
                     username=a.username,
                     identifier=a.identifier,
                     marker=a.marker,
-                    has_password=bool(a.password),
-                    has_token=bool(a.token),
-                    has_totp=bool(a.totp_secret),
+                    has_password=bool(a.password) or bool(prev and prev.has_password),
+                    has_token=bool(a.token) or bool(prev and prev.has_token),
+                    has_totp=bool(a.totp_secret) or bool(prev and prev.has_totp),
                 )
-                for a in data.accounts
-            ],
+            )
+        # Geheimnisse entfernter Konten löschen
+        for name in previous.keys() - {a.name for a in data.accounts}:
+            for field in SECRET_FIELDS:
+                keys.delete(secret_key(target_id, name, field))
+        return Target(
+            id=target_id,
+            created_at=created_at,
+            accounts=accounts,
             **data.model_dump(exclude={"accounts"}),
         )
-        for a in data.accounts:
-            for field in SECRET_FIELDS:
-                value = getattr(a, field)
-                if value:
-                    keys.set(secret_key(target.id, a.name, field), value)
+
+    @app.post("/targets", dependencies=protected, status_code=201)
+    def add_target(data: TargetIn) -> Target:
+        project = _validate(data)
+        target = _build(data, uuid.uuid4().hex[:12], datetime.now(UTC), None)
         store.save_target(target)
         store.audit(
             "target.added",
@@ -215,8 +230,24 @@ def create_app(
                 "project": project.id,
                 "kind": target.kind,
                 "url": target.url,
-                "accounts": names,
+                "accounts": [a.name for a in target.accounts],
             },
+        )
+        return target
+
+    @app.put("/targets/{target_id}", dependencies=protected)
+    def update_target(target_id: str, data: TargetIn) -> Target:
+        old = store.get_target(target_id)
+        if not old:
+            raise HTTPException(404, "Ziel nicht gefunden")
+        if data.project_id != old.project_id:
+            raise HTTPException(422, "Ein Ziel kann nicht in ein anderes Projekt verschoben werden")
+        project = _validate(data)
+        target = _build(data, old.id, old.created_at, old)
+        store.save_target(target)
+        store.audit(
+            "target.updated",
+            {"id": target.id, "project": project.id, "kind": target.kind, "url": target.url},
         )
         return target
 

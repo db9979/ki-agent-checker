@@ -42,7 +42,11 @@ interface AccountDraft {
   totp_secret: string;
   identifier: string;
   marker: string;
+  saved?: { password: boolean; token: boolean; totp: boolean };
 }
+
+type Method = "POST" | "PUT" | "GET";
+const SAVED = "•••• gespeichert, leer lassen = behalten";
 
 const emptyAccount = (n: number): AccountDraft => ({
   name: `Konto ${String.fromCharCode(65 + n)}`,
@@ -57,25 +61,48 @@ const emptyAccount = (n: number): AccountDraft => ({
 
 const orNull = (s: string) => (s.trim() ? s.trim() : null);
 
-export function TargetForm({ project, onSaved }: { project: Project; onSaved: (t: Target) => void }) {
+export function TargetForm({
+  project,
+  initial,
+  onSaved,
+}: {
+  project: Project;
+  initial?: Target;
+  onSaved: (t: Target) => void;
+}) {
   const { data: providers } = useApi<Provider[]>("/providers");
-  const [kind, setKind] = useState<TargetKind>("model");
-  const [name, setName] = useState("");
-  const [providerId, setProviderId] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
-  const [honeypot, setHoneypot] = useState(true);
-  const [url, setUrl] = useState(project.scope.find((s) => s.includes("://")) ?? "");
-  const [model, setModel] = useState("");
-  const [template, setTemplate] = useState('{"message": "{{message}}"}');
-  const [responsePath, setResponsePath] = useState("reply");
-  const [trustSelfSigned, setTrustSelfSigned] = useState(false);
-  const [authKind, setAuthKind] = useState<AuthKind>("none");
-  const [headerName, setHeaderName] = useState("X-API-Key");
-  const [loginUrl, setLoginUrl] = useState("");
-  const [loginBody, setLoginBody] = useState('{"username": "{{username}}", "password": "{{password}}"}');
-  const [tokenPath, setTokenPath] = useState("token");
-  const [accounts, setAccounts] = useState<AccountDraft[]>([]);
-  const [leakMarkers, setLeakMarkers] = useState("");
+  const [kind, setKind] = useState<TargetKind>(initial?.kind ?? "model");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [providerId, setProviderId] = useState(initial?.provider_id ?? "");
+  const [systemPrompt, setSystemPrompt] = useState(initial?.system_prompt ?? "");
+  const [honeypot, setHoneypot] = useState(initial?.honeypot_tools ?? true);
+  const [url, setUrl] = useState(initial?.url ?? project.scope.find((s) => s.includes("://")) ?? "");
+  const [model, setModel] = useState(initial?.model ?? "");
+  const [method, setMethod] = useState<Method>(initial?.method ?? "POST");
+  const [template, setTemplate] = useState(initial?.request_template ?? '{"message": "{{message}}"}');
+  const [responsePath, setResponsePath] = useState(initial?.response_path ?? "reply");
+  const [trustSelfSigned, setTrustSelfSigned] = useState(initial ? !initial.verify_tls : false);
+  const [authKind, setAuthKind] = useState<AuthKind>(initial?.auth.kind ?? "none");
+  const [headerName, setHeaderName] = useState(initial?.auth.header_name ?? "X-API-Key");
+  const [loginUrl, setLoginUrl] = useState(initial?.auth.login_url ?? "");
+  const [loginBody, setLoginBody] = useState(
+    initial?.auth.login_body ?? '{"username": "{{username}}", "password": "{{password}}"}',
+  );
+  const [tokenPath, setTokenPath] = useState(initial ? (initial.auth.token_path ?? "") : "token");
+  const [accounts, setAccounts] = useState<AccountDraft[]>(
+    (initial?.accounts ?? []).map((a) => ({
+      name: a.name,
+      role: a.role,
+      username: a.username ?? "",
+      password: "",
+      token: "",
+      totp_secret: "",
+      identifier: a.identifier ?? "",
+      marker: a.marker ?? "",
+      saved: { password: a.has_password, token: a.has_token, totp: a.has_totp },
+    })),
+  );
+  const [leakMarkers, setLeakMarkers] = useState((initial?.leak_markers ?? []).join("\n"));
   const [error, setError] = useState<string | null>(null);
 
   const needsAccount = authKind !== "none";
@@ -86,8 +113,8 @@ export function TargetForm({ project, onSaved }: { project: Project; onSaved: (t
   const save = async () => {
     setError(null);
     try {
-      const target = await api<Target>("/targets", {
-        method: "POST",
+      const target = await api<Target>(initial ? `/targets/${initial.id}` : "/targets", {
+        method: initial ? "PUT" : "POST",
         body: JSON.stringify({
           project_id: project.id,
           name: name || (kind === "model" ? "Agent-Entwurf" : url),
@@ -97,6 +124,8 @@ export function TargetForm({ project, onSaved }: { project: Project; onSaved: (t
           honeypot_tools: honeypot,
           url: kind === "model" ? null : url,
           model: orNull(model),
+          method,
+          delay: initial?.delay ?? 0.5,
           request_template: template,
           response_path: responsePath,
           verify_tls: !trustSelfSigned,
@@ -200,7 +229,15 @@ export function TargetForm({ project, onSaved }: { project: Project; onSaved: (t
               <input className={input} value={model} onChange={(e) => setModel(e.target.value)} />
             </label>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
+              <label className="block text-xs text-muted">
+                Methode
+                <select className={input} value={method} onChange={(e) => setMethod(e.target.value as Method)}>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>GET</option>
+                </select>
+              </label>
               <label className="col-span-2 block text-xs text-muted">
                 Anfrage (JSON, {"{{message}}"} oder {"{{messages}}"})
                 <input
@@ -317,7 +354,7 @@ export function TargetForm({ project, onSaved }: { project: Project; onSaved: (t
                       type="password"
                       value={a.password}
                       onChange={(e) => update(i, { password: e.target.value })}
-                      placeholder="Passwort"
+                      placeholder={a.saved?.password ? SAVED : "Passwort"}
                     />
                   </>
                 )}
@@ -326,7 +363,7 @@ export function TargetForm({ project, onSaved }: { project: Project; onSaved: (t
                     className={`${small} col-span-2`}
                     value={a.totp_secret}
                     onChange={(e) => update(i, { totp_secret: e.target.value })}
-                    placeholder="TOTP-Geheimnis für 2FA (optional)"
+                    placeholder={a.saved?.totp ? SAVED : "TOTP-Geheimnis für 2FA (optional)"}
                   />
                 )}
                 {(authKind === "bearer" || authKind === "header") && (
@@ -335,7 +372,7 @@ export function TargetForm({ project, onSaved }: { project: Project; onSaved: (t
                     type="password"
                     value={a.token}
                     onChange={(e) => update(i, { token: e.target.value })}
-                    placeholder="API-Schlüssel / Token"
+                    placeholder={a.saved?.token ? SAVED : "API-Schlüssel / Token"}
                   />
                 )}
                 <input
@@ -382,7 +419,7 @@ export function TargetForm({ project, onSaved }: { project: Project; onSaved: (t
         disabled={kind === "model" ? !providers?.length : !url}
         className="glow-cyan flex w-full items-center justify-center gap-2 rounded-xl bg-cyan/15 py-2 text-sm font-medium text-cyan disabled:opacity-40"
       >
-        <Plus size={15} /> Ziel speichern
+        <Plus size={15} /> {initial ? "Änderungen speichern" : "Ziel speichern"}
       </button>
     </div>
   );
