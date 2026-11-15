@@ -64,6 +64,23 @@ jobs:
             npx tauri build --config src-tauri/tauri.release.conf.json
           fi
 
+      # Startet die Engine aus dem fertigen Paket. Fängt z. B. Signaturprobleme ab,
+      # bei denen macOS das eingebettete Python nicht laden lässt.
+      - name: Engine im Paket starten (Smoke-Test)
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            macOS) BIN="$(ls -d app/src-tauri/target/release/bundle/macos/*.app)/Contents/MacOS/kac-engine" ;;
+            Windows) BIN="app/src-tauri/target/release/kac-engine.exe" ;;
+            *) BIN="app/src-tauri/target/release/kac-engine" ;;
+          esac
+          "$BIN" serve --no-auth --port 8799 --data-dir "$RUNNER_TEMP/kac" > engine.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8799/health; then echo; echo "Engine läuft"; exit 0; fi
+            sleep 2
+          done
+          echo "Engine startet nicht:"; cat engine.log; exit 1
+
       - uses: actions/upload-artifact@v4
         with:
           name: ki-agent-checker-${{ matrix.os }}-${{ runner.arch }}
