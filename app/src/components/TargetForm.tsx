@@ -120,6 +120,8 @@ export function TargetForm({
       saved: { password: a.has_password, token: a.has_token, totp: a.has_totp },
     })),
   );
+  const [mcpTool, setMcpTool] = useState(initial?.mcp_tool ?? "");
+  const [mcpArg, setMcpArg] = useState(initial?.mcp_arg ?? "");
   const [toolPolicy, setToolPolicy] = useState<ToolPolicy>(initial?.mcp_tool_calls ?? "readonly");
   const [leakMarkers, setLeakMarkers] = useState((initial?.leak_markers ?? []).join("\n"));
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +148,8 @@ export function TargetForm({
           method,
           delay: initial?.delay ?? 0.5,
           mcp_tool_calls: toolPolicy,
+          mcp_tool: kind === "mcp_tool" ? orNull(mcpTool) : null,
+          mcp_arg: kind === "mcp_tool" ? orNull(mcpArg) : null,
           request_template: template,
           response_path: responsePath,
           verify_tls: !trustSelfSigned,
@@ -185,7 +189,8 @@ export function TargetForm({
     }
   };
 
-  const k = KINDS.find((x) => x.kind === kind)!;
+  const isMcp = kind === "mcp" || kind === "mcp_tool";
+  const k = KINDS.find((x) => x.kind === (isMcp ? "mcp" : kind))!;
 
   return (
     <div className="space-y-3">
@@ -198,7 +203,7 @@ export function TargetForm({
               if (x.kind === "mcp" && !initial && authKind === "none") setAuthKind("bearer");
             }}
             className={`rounded-lg border px-2 py-1.5 text-xs ${
-              kind === x.kind ? "border-cyan bg-cyan/10 text-cyan" : "border-line text-muted hover:text-text"
+              k.kind === x.kind ? "border-cyan bg-cyan/10 text-cyan" : "border-line text-muted hover:text-text"
             }`}
           >
             {x.label}
@@ -253,10 +258,54 @@ export function TargetForm({
               className={`${input} font-mono`}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder={kind === "mcp" ? "https://server.de/mcp" : undefined}
+              placeholder={isMcp ? "https://server.de/mcp" : undefined}
             />
           </label>
-          {kind === "mcp" ? (
+          {isMcp && (
+            <div className="grid grid-cols-2 gap-1.5">
+              {(
+                [
+                  ["mcp", "Server prüfen (Audit)"],
+                  ["mcp_tool", "Ein Tool als Agent angreifen"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setKind(key)}
+                  className={`rounded-lg border px-2 py-1 text-[11px] ${
+                    kind === key ? "border-violet bg-violet/10 text-violet" : "border-line text-muted hover:text-text"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {kind === "mcp_tool" ? (
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs text-muted">
+                Tool
+                <input
+                  className={`${input} font-mono`}
+                  value={mcpTool}
+                  onChange={(e) => setMcpTool(e.target.value)}
+                  placeholder="z. B. ask_spark"
+                />
+              </label>
+              <label className="block text-xs text-muted">
+                Parameter für die Nachricht (optional)
+                <input
+                  className={`${input} font-mono`}
+                  value={mcpArg}
+                  onChange={(e) => setMcpArg(e.target.value)}
+                  placeholder="erster Text-Parameter"
+                />
+              </label>
+              <span className="col-span-2 text-[11px] text-muted">
+                Für Tools, hinter denen selbst ein Sprachmodell steckt. Jeder Chat-Angriff geht als Text an dieses Tool.
+              </span>
+            </div>
+          ) : kind === "mcp" ? (
             <label className="block text-xs text-muted">
               Tool-Aufrufe beim Test
               <select
@@ -432,9 +481,9 @@ export function TargetForm({
             </button>
           </div>
           <p className="mb-2 text-[11px] text-muted">
-            {kind === "mcp" ? "Zugang zum MCP-Server. Schlüssel landen im Schlüsselbund." : ""}
-            {kind !== "mcp" && "Am besten eigene Testkonten."}{" "}
-            {kind !== "mcp" &&
+            {isMcp ? "Zugang zum MCP-Server. Schlüssel landen im Schlüsselbund." : ""}
+            {!isMcp && "Am besten eigene Testkonten."}{" "}
+            {!isMcp &&
               "Mit zwei Konten samt Kennung und privater Angabe prüft die App, ob ein Konto an die Daten des anderen kommt. Passwörter und Tokens landen im Schlüsselbund."}
           </p>
           <div className="space-y-2">
@@ -488,7 +537,7 @@ export function TargetForm({
                     placeholder={a.saved?.token ? SAVED : "API-Schlüssel / Token"}
                   />
                 )}
-                {kind !== "mcp" && (
+                {!isMcp && (
                   <>
                     <input
                       className={small}
@@ -533,7 +582,7 @@ export function TargetForm({
       {error && <p className="text-xs text-red">{error}</p>}
       <button
         onClick={save}
-        disabled={kind === "model" ? !providers?.length : !url}
+        disabled={kind === "model" ? !providers?.length : !url || (kind === "mcp_tool" && !mcpTool)}
         className="glow-cyan flex w-full items-center justify-center gap-2 rounded-xl bg-cyan/15 py-2 text-sm font-medium text-cyan disabled:opacity-40"
       >
         <Plus size={15} /> {initial ? "Änderungen speichern" : "Ziel speichern"}
