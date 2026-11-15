@@ -89,6 +89,10 @@ Der Workflow `Desktop-Build` baut automatisch bei jedem Push auf `main` und bei 
 | Linux (x64) | DEB, AppImage |
 | Linux (ARM64), z. B. ClockworkPi uConsole mit Raspberry Pi OS | DEB, AppImage |
 
+Die macOS-App ist nur ad hoc signiert (ohne Apple-Developer-Konto). Beim ersten Start meldet macOS,
+dass der Entwickler nicht überprüft werden kann: unter **Systemeinstellungen → Datenschutz & Sicherheit**
+auf **Dennoch öffnen** klicken. Alternativ im Terminal: `xattr -cr "/Applications/KI-Agent-Checker.app"`.
+
 Auf dem uConsole: `sudo apt install ./KI-Agent-Checker_*_arm64.deb`. Bei Bildschirmen unter
 1500 × 960 startet die App maximiert, unter 1400 px Breite zeigt die Seitenleiste nur Symbole. Für signierte Installer werden später ein Apple-Developer-Konto
 und ein Windows-Code-Signing-Zertifikat benötigt.
