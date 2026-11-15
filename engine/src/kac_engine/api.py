@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import hmac
+import re
+import secrets as pysecrets
 import time
 import uuid
 from datetime import UTC, datetime
@@ -13,9 +16,10 @@ from typing import Literal
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, mcp, providers, skills
+from . import __version__, mcp, providers, report, skills
 from . import attacks as attack_lib
 from .demo import run_demo
 from .events import EventHub
@@ -88,6 +92,7 @@ def create_app(
     token: str | None = None,
     db_path: Path | str = ":memory:",
     secrets: SecretStore | None = None,
+    reports_dir: Path | str | None = None,
 ) -> FastAPI:
     """Erzeugt die App. Mit ``token`` verlangt jede Anfrage ``Authorization: Bearer <token>``."""
     app = FastAPI(title="KI-Agent-Checker Engine", version=__version__)
@@ -339,8 +344,7 @@ def create_app(
                 hub, store, project_id=data.project_id, delay=max(0.0, data.delay), run_id=run_id
             )
         )
-        tasks[run_id] = task
-        task.add_done_callback(lambda _: tasks.pop(run_id, None))
+        _track(run_id, task)
         return {"run_id": run_id}
 
     @app.post("/runs", dependencies=protected, status_code=202)
@@ -398,8 +402,7 @@ def create_app(
             )
         else:
             task = asyncio.create_task(run_target(hub, store, keys, cfg, run_id=run_id))
-        tasks[run_id] = task
-        task.add_done_callback(lambda _: tasks.pop(run_id, None))
+        _track(run_id, task)
         return {"run_id": run_id}
 
     @app.post("/runs/{run_id}/cancel", dependencies=protected, status_code=202)
@@ -410,6 +413,67 @@ def create_app(
         task.cancel()
         store.audit("run.cancelled", {"id": run_id})
         return {"ok": True}
+
+    # Berichte --------------------------------------------------------------
+    report_key = pysecrets.token_bytes(32)
+    reports_dir = Path(reports_dir) if reports_dir else None
+
+    def _track(run_id: str, task: asyncio.Task) -> None:
+        tasks[run_id] = task
+
+        def done(_: asyncio.Task) -> None:
+            tasks.pop(run_id, None)
+            log = report.collect_log(hub.history(run_id))
+            if log:
+                store.save_run_log(run_id, log)
+
+        task.add_done_callback(done)
+
+    def _report_html(run_id: str) -> tuple[str, str]:
+        run = store.get_run(run_id)
+        if not run:
+            raise HTTPException(404, "Lauf nicht gefunden")
+        log = store.get_run_log(run_id) or report.collect_log(hub.history(run_id))
+        project = store.get_project(run.project_id) if run.project_id else None
+        text = report.render(
+            run, project, log, store.list_skills(), generated_by=f"KI-Agent-Checker {__version__}"
+        )
+        stem = re.sub(r"[^\w.-]+", "-", run.target.split("(")[0]).strip("-")[:50] or "Ziel"
+        name = f"Sicherheitsbericht-{stem}-{run.started_at.astimezone():%Y-%m-%d-%H%M}.html"
+        return text, name
+
+    def _sign(name: str) -> str:
+        return hmac.new(report_key, name.encode(), hashlib.sha256).hexdigest()[:32]
+
+    @app.get("/runs/{run_id}/report", dependencies=protected, response_class=HTMLResponse)
+    def get_report(run_id: str) -> HTMLResponse:
+        text, name = _report_html(run_id)
+        return HTMLResponse(text, headers={"Content-Disposition": f'inline; filename="{name}"'})
+
+    @app.post("/runs/{run_id}/report", dependencies=protected)
+    def save_report(run_id: str) -> dict:
+        """Speichert den Bericht (Standard: Downloads) und gibt einen Link zum Öffnen im Browser."""
+        text, name = _report_html(run_id)
+        folder = reports_dir or next(
+            (p for p in (Path.home() / "Downloads", Path.home() / "Download") if p.is_dir()),
+            Path.home(),
+        )
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / name
+        path.write_text(text, encoding="utf-8")
+        store.audit("report.saved", {"run": run_id, "path": str(path)})
+        saved[name] = path
+        return {"path": str(path), "url": f"/reports/{name}?t={_sign(name)}"}
+
+    saved: dict[str, Path] = {}
+
+    @app.get("/reports/{name}", response_class=HTMLResponse)
+    def open_report(name: str, t: str = Query("")) -> HTMLResponse:
+        """Ohne Engine-Token, damit der Standardbrowser den Bericht öffnen kann; geschützt durch die Signatur."""
+        path = saved.get(name)
+        if not path or not hmac.compare_digest(t, _sign(name)) or not path.is_file():
+            raise HTTPException(404, "Bericht nicht gefunden")
+        return HTMLResponse(path.read_text(encoding="utf-8"))
 
     # Skills ---------------------------------------------------------------
     def _refresh_skills() -> None:
