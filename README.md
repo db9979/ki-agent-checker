@@ -18,10 +18,21 @@ die Ergebnisse visualisiert und Gegenmaßnahmen vorschlägt. Selbst gehostete Mo
 | Engine | Python, FastAPI, SQLite, WebSocket für Live-Events |
 | Modelle | LiteLLM-Anbindung, Modellsuche für Ollama und OpenAI-kompatible Server, Verbindungstest, Schlüssel im System-Schlüsselbund |
 | Projekte | Scope-Liste, Berechtigungsbestätigung, Audit-Log |
-| Visualisierung | Dashboard mit Security-Score, Heatmap Modul × OWASP LLM Top 10, Radar, Score-Verlauf, Live-Angriffsansicht, Angriffsgraph |
+| Visualisierung | Dashboard mit Security-Score, Heatmap Modul × OWASP LLM Top 10, Radar, Score-Verlauf, 3D-Angriffsarena mit HUD, Angriffsgraph mit Datenstrom, Zeitleiste zum Abspielen eines Laufs |
 | Demo-Lauf | Vorbereiteter Lauf gegen einen fiktiven Kundenservice-Agenten, braucht kein Modell |
 
 Echte Testmodule gegen eigene Agenten folgen in Phase 2 (siehe Konzept).
+
+![Angriffsarena](docs/screenshots/arena.gif)
+
+Die Live-Ansicht zeigt den Ziel-Agenten als Kern hinter einem Schutzschild. Jeder Angriff fliegt als
+Lichtgeschoss heran: abgewehrt prallt er ab, ein Durchbruch reißt das Schild auf, löst Alarm aus und lässt
+die missbrauchten Tools und Datenquellen rot glühen. Über die Zeitleiste lässt sich jeder Lauf erneut
+abspielen, vorspulen oder an eine Stelle springen, in der Arena und im Angriffsgraphen.
+
+Unten in der Seitenleiste schaltet **Effekte: voll / Leistungsmodus** zwischen voller Darstellung
+(Bloom, Partikel, Glitch) und einer sparsamen Variante für schwache Geräte wie den uConsole um.
+Auf kleinen Bildschirmen mit wenigen Kernen und bei „Bewegung reduzieren“ ist der Leistungsmodus voreingestellt.
 
 | Dashboard | Live-Angriff |
 | --- | --- |

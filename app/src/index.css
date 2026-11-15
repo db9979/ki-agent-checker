@@ -65,3 +65,129 @@ body {
   --xy-background-color: transparent;
   --xy-edge-label-background-color: #070b14;
 }
+
+/* ------------------------------------------------------------------ */
+/* Arena und HUD                                                       */
+
+.arena-label {
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.04em;
+  color: #c4b5fd;
+  padding: 3px 7px;
+  border: 1px solid #a78bfa55;
+  border-radius: 6px;
+  background: #0b0f1fcc;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.arena-label[data-hot="1"] {
+  color: #fecdd3;
+  border-color: #f43f5e;
+  box-shadow: 0 0 14px #f43f5e88;
+}
+
+.hud-scanlines {
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, #ffffff06 0 1px, transparent 1px 3px);
+  animation: hud-scan 8s linear infinite;
+}
+@keyframes hud-scan {
+  to {
+    background-position: 0 120px;
+  }
+}
+
+.hud-sweep::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, #22d3ee55, transparent 70deg);
+  animation: hud-spin 2.6s linear infinite;
+}
+@keyframes hud-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hud-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: #22d3eecc;
+  pointer-events: none;
+}
+
+.hud-caret::after {
+  content: "▌";
+  margin-left: 1px;
+  color: #22d3ee;
+  animation: hud-blink 0.9s steps(1) infinite;
+}
+@keyframes hud-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.hud-glitch {
+  animation: hud-glitch 0.45s steps(2) 2;
+}
+@keyframes hud-glitch {
+  0% {
+    transform: translate(0);
+    text-shadow: 2px 0 #f43f5e, -2px 0 #22d3ee;
+  }
+  25% {
+    transform: translate(-3px, 1px) skewX(-6deg);
+  }
+  50% {
+    transform: translate(3px, -1px);
+    text-shadow: -3px 0 #f43f5e, 3px 0 #22d3ee;
+  }
+  75% {
+    transform: translate(-1px, 2px) skewX(4deg);
+  }
+  100% {
+    transform: translate(0);
+    text-shadow: none;
+  }
+}
+
+.hud-alarm {
+  pointer-events: none;
+  box-shadow: inset 0 0 120px #f43f5e88;
+  animation: hud-alarm 1.2s ease-out forwards;
+}
+@keyframes hud-alarm {
+  0%,
+  30% {
+    opacity: 1;
+  }
+  15% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.node-pulse {
+  animation: node-pulse 1.6s ease-in-out infinite;
+}
+@keyframes node-pulse {
+  50% {
+    filter: brightness(1.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-scanlines,
+  .hud-sweep::before,
+  .hud-glitch,
+  .node-pulse {
+    animation: none;
+  }
+}
