@@ -117,7 +117,7 @@ def test_promptfoo_run_and_missing_tool(engine):
     check = client.get(
         "/scanners/check", params={"tool": "garak", "cmd": "gibt-es-nicht-kac"}
     ).json()
-    assert not check["ok"] and "pip install garak" in check["error"]
+    assert not check["ok"] and "pipx install garak" in check["error"]
     failed = wait(
         client,
         client.post(

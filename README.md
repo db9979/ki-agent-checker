@@ -89,7 +89,7 @@ Im Dashboard erzeugt **Bericht** für den letzten Lauf (oder unter „Letzte Lä
 
 ### garak und Promptfoo
 
-Im Testlauf lassen sich statt der eigenen Angriffe auch [garak](https://github.com/NVIDIA/garak) oder [Promptfoo](https://www.promptfoo.dev/) wählen. Beide werden separat installiert (`pip install garak`, Promptfoo per `npx -y promptfoo@latest` mit Node.js 18+). Die App stellt für die Dauer des Laufs eine lokale Brücke bereit, über die der Scanner mit dem Ziel spricht. Anmeldung, 2FA, eigene Modelle und MCP-Tools funktionieren damit genauso wie bei den eigenen Angriffen. garak-Ergebnisse erscheinen live im Angriffspfad, Promptfoo-Ergebnisse nach dem Lauf. Befunde werden nach OWASP LLM Top 10 eingeordnet.
+Im Testlauf lassen sich statt der eigenen Angriffe auch [garak](https://github.com/NVIDIA/garak) oder [Promptfoo](https://www.promptfoo.dev/) wählen. Beide werden separat installiert (`pipx install garak`, auf dem Mac vorher `brew install pipx`; Promptfoo per `npx -y promptfoo@latest` mit Node.js 18+). Die App stellt für die Dauer des Laufs eine lokale Brücke bereit, über die der Scanner mit dem Ziel spricht. Anmeldung, 2FA, eigene Modelle und MCP-Tools funktionieren damit genauso wie bei den eigenen Angriffen. garak-Ergebnisse erscheinen live im Angriffspfad, Promptfoo-Ergebnisse nach dem Lauf. Befunde werden nach OWASP LLM Top 10 eingeordnet.
 
 ### Ein MCP-Tool als Agent angreifen
 

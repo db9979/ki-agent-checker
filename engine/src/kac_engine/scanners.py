@@ -1,7 +1,7 @@
 """Externe Scanner: garak und Promptfoo laufen gegen jedes Ziel der App.
 
 Die Scanner werden nicht mitgeliefert, sondern auf dem Rechner installiert
-(``pip install garak``, Promptfoo per ``npx promptfoo@latest``). Damit sie jedes
+(``pipx install garak``, Promptfoo per ``npx promptfoo@latest``). Damit sie jedes
 Ziel erreichen, auch hinter Login, 2FA, als eigenes Modell oder als MCP-Tool, stellt
 die Engine für die Dauer des Laufs eine lokale Brücke bereit:
 ``POST /bridge/<schlüssel>`` mit ``{"message": "..."}`` antwortet mit ``{"reply": "..."}``.
@@ -38,7 +38,7 @@ DEFAULT_GARAK_PROBES = (
     "promptinject,dan.DanInTheWild,encoding.InjectBase64,leakreplay,latentinjection,xss"
 )
 INSTALL_HINT = {
-    "garak": "garak installieren: pip install garak (Python 3.10+), dann hier „garak“ oder den Pfad eintragen",
+    "garak": "garak installieren: pipx install garak (Mac: vorher brew install pipx; sonst pip install garak, Python 3.10+), dann hier „garak“ oder den Pfad eintragen",
     "promptfoo": "Promptfoo braucht Node.js 18+; „npx -y promptfoo@latest“ lädt es beim ersten Lauf",
 }
 

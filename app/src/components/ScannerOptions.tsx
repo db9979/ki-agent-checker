@@ -111,7 +111,7 @@ export function ScannerOptions({
       )}
       <p className="text-[10px] leading-relaxed">
         {garak
-          ? "garak wird separat installiert (pip install garak). Es spricht über eine lokale Brücke mit dem Ziel, Anmeldung und 2FA übernimmt die App."
+          ? "garak wird separat installiert (pipx install garak, auf dem Mac vorher brew install pipx). Es spricht über eine lokale Brücke mit dem Ziel, Anmeldung und 2FA übernimmt die App."
           : "Promptfoo braucht Node.js 18+. Zum Erzeugen der Angriffe nutzt es seinen Online-Dienst oder einen eigenen Modell-Schlüssel (z. B. OPENAI_API_KEY)."}
       </p>
     </div>
