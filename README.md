@@ -95,6 +95,33 @@ Im Testlauf lassen sich statt der eigenen Angriffe auch [garak](https://github.c
 
 Steckt hinter einem MCP-Tool selbst ein Sprachmodell (z. B. `ask_spark`), wählt man beim MCP-Server „Ein Tool als Agent angreifen“. Dann laufen alle Chat-Angriffe sowie garak und Promptfoo gegen dieses Tool.
 
+### Ohne Oberfläche prüfen (Kommandozeile und CI)
+
+`kac-engine scan` führt einen Testlauf ohne App aus. Der Exit-Code ist 0 (bestanden), 1 (Befunde ab `--fail-on`, Standard „Hoch“) oder 2 (Fehler). Die Engine steckt in jeder Installation, auf dem Mac z. B. unter `/Applications/KI-Agent-Checker.app/Contents/MacOS/kac-engine`.
+
+```bash
+# Ziel, das in der App angelegt ist (Zugangsdaten aus dem Schlüsselbund)
+kac-engine scan --target spark --report bericht.html
+
+# Alles aus einer Datei, Geheimnisse aus Umgebungsvariablen (für CI)
+SPARK_TOKEN=... kac-engine scan --config kac.yaml --junit ergebnis.xml --json ergebnis.json
+```
+
+Ein Beispiel für `kac.yaml` liegt unter [docs/beispiele/kac.yaml](docs/beispiele/kac.yaml). Mit `--config` wird nichts gespeichert, und das Projekt muss die Testberechtigung ausdrücklich bestätigen.
+
+Als GitHub Action (bei einem privaten Repo muss unter Settings → Actions → Access der Zugriff für die eigenen Repos erlaubt sein):
+
+```yaml
+- uses: db9979/ki-agent-checker@main
+  with:
+    config: kac.yaml
+    fail-on: high
+  env:
+    SPARK_TOKEN: ${{ secrets.SPARK_TOKEN }}
+```
+
+Die Action schreibt die Zusammenfassung in den Job, lädt Bericht, JSON und JUnit-XML als Artefakt hoch und gibt den Score als Output `score` aus.
+
 ## Aufbau
 
 ```
