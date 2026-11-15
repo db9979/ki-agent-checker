@@ -6,6 +6,7 @@ export const MODULES = [
   { key: "data_exfiltration", label: "Datenabfluss", owasp: "LLM02" },
   { key: "excessive_agency", label: "Tool-Missbrauch", owasp: "LLM06" },
   { key: "cross_account", label: "Fremde Kontodaten", owasp: "LLM02" },
+  { key: "multi_turn", label: "Mehrstufig", owasp: "LLM01" },
   { key: "mcp_auth", label: "Zugangsschutz", owasp: "LLM06" },
   { key: "mcp_poisoning", label: "Tool-Poisoning", owasp: "LLM01" },
   { key: "mcp_agency", label: "Riskante Tools", owasp: "LLM06" },

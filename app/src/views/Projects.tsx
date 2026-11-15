@@ -63,6 +63,8 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
   const { data: providers } = useApi<Provider[]>("/providers");
   const [off, setOff] = useState<Set<string>>(new Set());
   const [judge, setJudge] = useState("");
+  const [attacker, setAttacker] = useState("");
+  const [maxTurns, setMaxTurns] = useState(5);
   const [error, setError] = useState<string | null>(null);
   const pairs = target.accounts.filter((a) => a.identifier && a.marker).length;
   const manual = target.auth.mfa === "manual";
@@ -85,6 +87,8 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
           target_id: target.id,
           modules: (modules ?? []).map((m) => m.key).filter((k) => !off.has(k)),
           judge_provider_id: judge || null,
+          attacker_provider_id: attacker || null,
+          max_turns: maxTurns,
           mfa_codes: manual ? codes : {},
           scanner: source === "own" ? null : scanner,
         }),
@@ -128,7 +132,8 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
       {source !== "own" && <ScannerOptions value={scanner} onChange={setScanner} />}
       <div className={`grid grid-cols-2 gap-1 ${source !== "own" ? "hidden" : ""}`}>
         {(modules ?? []).map((m) => {
-          const unavailable = m.needs_accounts > pairs || (noCalls && !!m.calls_tools);
+          const noAttacker = !!m.needs_attacker && !attacker;
+          const unavailable = m.needs_accounts > pairs || (noCalls && !!m.calls_tools) || noAttacker;
           return (
             <label
               key={m.key}
@@ -137,7 +142,9 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
                 unavailable
                   ? isMcp
                     ? "Ruft Tools auf, beim Ziel sind Tool-Aufrufe ausgeschaltet"
-                    : "Braucht zwei Testkonten mit Kennung und privater Angabe"
+                    : noAttacker
+                      ? "Braucht ein Angreifer-Modell (unten auswählen)"
+                      : "Braucht zwei Testkonten mit Kennung und privater Angabe"
                   : m.title
               }
             >
@@ -159,6 +166,37 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
           );
         })}
       </div>
+      {!isMcp && source === "own" && (
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <label className="block text-xs text-muted">
+            Angreifer-Modell (für mehrstufige Angriffe, optional)
+            <select
+              className="mt-1 w-full rounded-md border border-line bg-[#0b1222] px-2 py-1.5 text-xs"
+              value={attacker}
+              onChange={(e) => setAttacker(e.target.value)}
+            >
+              <option value="">ohne (keine mehrstufigen Angriffe)</option>
+              {(providers ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={`block text-xs text-muted ${attacker ? "" : "opacity-40"}`}>
+            Runden
+            <input
+              type="number"
+              min={1}
+              max={10}
+              disabled={!attacker}
+              value={maxTurns}
+              onChange={(e) => setMaxTurns(Math.min(10, Math.max(1, Number(e.target.value) || 1)))}
+              className="mt-1 w-16 rounded-md border border-line bg-[#0b1222] px-2 py-1.5 text-xs"
+            />
+          </label>
+        </div>
+      )}
       {!isMcp && source === "own" && (
         <label className="block text-xs text-muted">
           Richter-Modell (bewertet unklare Antworten, optional)

@@ -50,6 +50,11 @@ export function pathOf(a: Attack): PathInfo {
       return { state: "breach", layer: 3, reason: "Geheimnisse aus dem System-Prompt ausgegeben" };
     case "cross_account":
       return { state: "breach", layer: 3, reason: "Daten eines anderen Kontos ausgegeben" };
+    case "multi_turn": {
+      const n = a.messages.filter((m) => m.role === "attacker").length;
+      if (tool) return { state: "breach", layer: EXTERNAL_TOOLS.has(tool.name) ? 4 : 3, reason: `nach ${n} Nachrichten ${tool.name} ausgelöst` };
+      return { state: "breach", layer: 2, reason: `nach ${n} Nachrichten umgestimmt` };
+    }
     case "mcp_auth":
       return { state: "breach", layer: 3, reason: "Tools ohne gültige Anmeldung erreichbar" };
     case "mcp_poisoning":
