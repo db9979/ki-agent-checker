@@ -36,7 +36,7 @@ from .store import Store
 
 DEFAULT_CMD = {"garak": "garak", "promptfoo": "npx -y promptfoo@latest"}
 DEFAULT_GARAK_PROBES = (
-    "promptinject,dan.DanInTheWild,encoding.InjectBase64,leakreplay,latentinjection,xss"
+    "promptinject,dan.DanInTheWild,encoding.InjectBase64,leakreplay,latentinjection,web_injection"
 )
 INSTALL_HINT = {
     "garak": "garak installieren: pipx install garak (Mac: vorher brew install pipx; sonst pip install garak, Python 3.10+), dann hier „garak“ oder den Pfad eintragen",
@@ -358,7 +358,7 @@ def garak_files(workdir: Path, run_id: str, bridge_url: str, cfg: ScannerConfig)
         "--config",
         str(workdir / "garak.yaml"),
         "--probes",
-        cfg.probes or DEFAULT_GARAK_PROBES,
+        garak_probes(cfg.probes),
         "--report_prefix",
         f"kac-{run_id}",
     ]
@@ -391,6 +391,15 @@ def promptfoo_config(bridge_url: str, cfg: ScannerConfig) -> dict:
 
 
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+# Probe-Namen, die es in neueren garak-Versionen nicht mehr gibt
+RENAMED_PROBES = {"xss": "web_injection"}
+
+
+def garak_probes(probes: str) -> str:
+    names = [p.strip() for p in (probes or DEFAULT_GARAK_PROBES).split(",") if p.strip()]
+    return ",".join(dict.fromkeys(RENAMED_PROBES.get(n, n) for n in names))
+
+
 PROGRESS = re.compile(r"(probes\.[\w.]+)[^%]*?(\d+)%")
 
 
@@ -582,8 +591,12 @@ async def run_scanner(
         await report_status(force=True)
         if cfg.tool == "garak":
             code = await stream([*base, *garak_files(workdir, run_id, bridge_url, cfg)])
-            if code != 0 and not hits:
-                raise ScannerError("garak ist fehlgeschlagen: " + " ".join(tail[-6:])[-500:])
+            if not hits:
+                # garak beendet sich bei falschen Optionen oft mit Code 0 und meldet nur „❌ …“
+                errors = [ln for ln in tail if "❌" in ln or "error" in ln.lower()]
+                last = " | ".join((errors or tail)[-6:])[-600:] or "keine Ausgabe"
+                why = f"Exit-Code {code}" if code else f"{requests} Anfragen ans Ziel"
+                raise ScannerError(f"garak hat keine Ergebnisse geliefert ({why}). Ausgabe: {last}")
         elif cfg.tool == "promptfoo":
             (workdir / "promptfooconfig.yaml").write_text(
                 yaml.safe_dump(promptfoo_config(bridge_url, cfg), allow_unicode=True),

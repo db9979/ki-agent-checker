@@ -173,3 +173,23 @@ def test_status_line_and_prompt_cap(tmp_path):
 
     cfg = yaml.safe_load((tmp_path / "garak.yaml").read_text())
     assert cfg["run"]["soft_probe_prompt_cap"] == 7
+
+
+def test_garak_without_results_reports_output(engine):
+    client, _ = engine
+    cmd = f'"{sys.executable}" "{FAKES / "fake_garak_bad.py"}"'
+    run_id = client.post(
+        "/runs", json={"target_id": make_target(client), "scanner": {"tool": "garak", "cmd": cmd}}
+    ).json()["run_id"]
+    run = wait(client, run_id)
+    assert run["status"] == "failed"
+    err = [e for e in client.get(f"/runs/{run_id}/events").json() if e["type"] == "run.error"]
+    assert "keine Ergebnisse" in err[0]["error"] and "Unknown probes" in err[0]["error"]
+
+
+def test_garak_probes_renames_outdated_names():
+    from kac_engine.scanners import garak_probes
+
+    assert garak_probes("promptinject, xss") == "promptinject,web_injection"
+    assert garak_probes("xss,web_injection") == "web_injection"
+    assert "xss" not in garak_probes("")

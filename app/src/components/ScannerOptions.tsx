@@ -16,7 +16,7 @@ export interface ScannerSettings {
 const DEFAULTS: Record<ScannerTool, Omit<ScannerSettings, "tool">> = {
   garak: {
     cmd: "garak",
-    probes: "promptinject,dan.DanInTheWild,encoding.InjectBase64,leakreplay,latentinjection,xss",
+    probes: "promptinject,dan.DanInTheWild,encoding.InjectBase64,leakreplay,latentinjection,web_injection",
     purpose: "",
     num_tests: 3,
     max_prompts: 20,
