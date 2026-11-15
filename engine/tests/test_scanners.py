@@ -193,3 +193,16 @@ def test_garak_probes_renames_outdated_names():
     assert garak_probes("promptinject, xss") == "promptinject,web_injection"
     assert garak_probes("xss,web_injection") == "web_injection"
     assert "xss" not in garak_probes("")
+
+
+def test_promptfoo_email_prompt_fails_with_instructions(engine):
+    client, _ = engine
+    cmd = f'"{sys.executable}" "{FAKES / "fake_promptfoo_email.py"}"'
+    run_id = client.post(
+        "/runs",
+        json={"target_id": make_target(client), "scanner": {"tool": "promptfoo", "cmd": cmd}},
+    ).json()["run_id"]
+    run = wait(client, run_id)
+    assert run["status"] == "failed"
+    err = [e for e in client.get(f"/runs/{run_id}/events").json() if e["type"] == "run.error"]
+    assert "promptfoo config set email" in err[0]["error"]

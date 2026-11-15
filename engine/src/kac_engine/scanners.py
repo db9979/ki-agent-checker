@@ -403,6 +403,19 @@ def garak_probes(probes: str) -> str:
 PROGRESS = re.compile(r"(probes\.[\w.]+)[^%]*?(\d+)%")
 
 
+PROMPTFOO_EMAIL = re.compile(
+    r"require email verification|Email Verification Required|Work email:|email address is not verified",
+    re.I,
+)
+PROMPTFOO_EMAIL_HINT = (
+    "Promptfoo verlangt für Red-Team-Scans einmalig eine bestätigte E-Mail-Adresse und wartet "
+    "sonst auf eine Eingabe. So geht es: Terminal öffnen, „promptfoo config set email "
+    "<deine Arbeits-E-Mail>“ ausführen und den Scan in der App neu starten. Kommt danach eine "
+    "Mail von Promptfoo, den Bestätigungslink anklicken und den Scan noch einmal starten. "
+    "Wer ein Promptfoo-Konto hat, kann stattdessen „promptfoo auth login“ nutzen."
+)
+
+
 def status_line(raw: str) -> str:
     """Bereinigt eine Ausgabezeile (Farben, Fortschrittsbalken) für die Anzeige."""
     line = ANSI.sub("", raw).strip()
@@ -525,6 +538,8 @@ async def run_scanner(
                 *resolve(cmd),
                 cwd=workdir,
                 env=env,
+                # Ohne Eingabe: Rückfragen der Scanner dürfen den Lauf nicht anhalten
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
@@ -571,6 +586,10 @@ async def run_scanner(
                         report = Path(m.group(1))
                     if shown := status_line(line):
                         phase = shown
+                    if cfg.tool == "promptfoo" and PROMPTFOO_EMAIL.search(line):
+                        proc.kill()
+                        await proc.wait()
+                        raise ScannerError(PROMPTFOO_EMAIL_HINT)
             elif raw == b"":
                 if pending.strip():
                     tail.append(pending.rstrip())
