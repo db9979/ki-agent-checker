@@ -8,7 +8,13 @@ const PRESETS: { kind: ProviderKind; label: string; url: string; needsKey: boole
   { kind: "ollama", label: "Ollama", url: "http://localhost:11434", needsKey: false, local: true },
   { kind: "openai_compatible", label: "vLLM", url: "http://localhost:8000/v1", needsKey: false, local: true },
   { kind: "openai_compatible", label: "LM Studio", url: "http://localhost:1234/v1", needsKey: false, local: true },
-  { kind: "openai_compatible", label: "OpenAI-kompatibel", url: "http://localhost:8080/v1", needsKey: false, local: true },
+  {
+    kind: "openai_compatible",
+    label: "OpenAI-kompatibel",
+    url: "http://localhost:8080/v1",
+    needsKey: false,
+    local: true,
+  },
   { kind: "openai", label: "OpenAI", url: "", needsKey: true, local: false },
   { kind: "anthropic", label: "Anthropic", url: "", needsKey: true, local: false },
   { kind: "gemini", label: "Google Gemini", url: "", needsKey: true, local: false },
@@ -42,7 +48,12 @@ export function Models() {
     setMessage(null);
     const res = await api<{ ok: boolean; models: string[]; error?: string }>("/providers/discover", {
       method: "POST",
-      body: JSON.stringify({ kind: p.kind, base_url: url || null, api_key: key || null, verify_tls: !(p.local && trustSelfSigned) }),
+      body: JSON.stringify({
+        kind: p.kind,
+        base_url: url || null,
+        api_key: key || null,
+        verify_tls: !(p.local && trustSelfSigned),
+      }),
     });
     setBusy(null);
     setFound(res.models);
@@ -91,7 +102,8 @@ export function Models() {
       <header className="col-span-12">
         <h1 className="text-2xl font-semibold">Modelle</h1>
         <p className="text-sm text-muted">
-          Selbst gehostete und Cloud-Modelle für Angreifer, Richter und Ziel. API-Schlüssel liegen im Schlüsselbund des Systems.
+          Selbst gehostete und Cloud-Modelle für Angreifer, Richter und Ziel. API-Schlüssel liegen im Schlüsselbund des
+          Systems.
         </p>
       </header>
 
@@ -144,7 +156,10 @@ export function Models() {
             </datalist>
           </label>
           {p.local && (
-            <button onClick={discover} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm hover:border-cyan">
+            <button
+              onClick={discover}
+              className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm hover:border-cyan"
+            >
               {busy === "discover" ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />} Suchen
             </button>
           )}
@@ -173,18 +188,31 @@ export function Models() {
             return (
               <div key={pr.id} className="rounded-xl border border-line bg-panel-2/60 p-3">
                 <div className="flex items-center gap-3">
-                  {pr.self_hosted ? <HardDrive size={16} className="text-green" /> : <Cloud size={16} className="text-cyan" />}
+                  {pr.self_hosted ? (
+                    <HardDrive size={16} className="text-green" />
+                  ) : (
+                    <Cloud size={16} className="text-cyan" />
+                  )}
                   <div className="flex-1">
                     <div className="text-sm font-medium">{pr.name}</div>
                     <div className="font-mono text-[11px] text-muted">
                       {pr.kind}/{pr.model} {pr.base_url ? `· ${pr.base_url}` : ""}
                     </div>
-                    {!pr.verify_tls && <div className="mt-0.5 text-[10px] text-amber">vertraut selbst signierten Zertifikaten</div>}
+                    {!pr.verify_tls && (
+                      <div className="mt-0.5 text-[10px] text-amber">vertraut selbst signierten Zertifikaten</div>
+                    )}
                   </div>
-                  <button onClick={() => test(pr.id)} className="rounded-lg border border-line px-3 py-1.5 text-xs hover:border-cyan">
+                  <button
+                    onClick={() => test(pr.id)}
+                    className="rounded-lg border border-line px-3 py-1.5 text-xs hover:border-cyan"
+                  >
                     {busy === pr.id ? <Loader2 size={13} className="animate-spin" /> : "Testen"}
                   </button>
-                  <button onClick={() => remove(pr.id)} className="rounded-lg p-1.5 text-muted hover:text-red" title="Entfernen">
+                  <button
+                    onClick={() => remove(pr.id)}
+                    className="rounded-lg p-1.5 text-muted hover:text-red"
+                    title="Entfernen"
+                  >
                     <Trash2 size={15} />
                   </button>
                 </div>

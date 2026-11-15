@@ -76,7 +76,15 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
       attempts: 0,
       hits: 0,
     }));
-    return { ...initial, online: s.online, runId: e.run_id, status: "running", target: e.target as string, total: e.total as number, modules };
+    return {
+      ...initial,
+      online: s.online,
+      runId: e.run_id,
+      status: "running",
+      target: e.target as string,
+      total: e.total as number,
+      modules,
+    };
   }
   if (e.run_id !== s.runId) return s;
 
@@ -102,7 +110,17 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
         ...s,
         attacks: s.attacks.map((a) =>
           a.id === e.attack_id
-            ? { ...a, messages: [...a.messages, { role: e.role as Message["role"], text: e.text as string, tool_call: e.tool_call as Message["tool_call"] }] }
+            ? {
+                ...a,
+                messages: [
+                  ...a.messages,
+                  {
+                    role: e.role as Message["role"],
+                    text: e.text as string,
+                    tool_call: e.tool_call as Message["tool_call"],
+                  },
+                ],
+              }
             : a,
         ),
       };
@@ -112,7 +130,12 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
         done: e.done as number,
         attacks: s.attacks.map((a) =>
           a.id === e.attack_id
-            ? { ...a, success: e.success as boolean, signal: e.signal as string, severity: e.severity as Severity | null }
+            ? {
+                ...a,
+                success: e.success as boolean,
+                signal: e.signal as string,
+                severity: e.severity as Severity | null,
+              }
             : a,
         ),
         modules: s.modules.map((m) =>

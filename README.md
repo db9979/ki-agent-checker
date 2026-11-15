@@ -55,6 +55,20 @@ schwache Geräte wie den uConsole herunter.
 | **Angriffsgraph** | **Modelle** |
 | ![Angriffsgraph](docs/screenshots/angriffsgraph.png) | ![Modelle](docs/screenshots/modelle.png) |
 
+### Einen MCP-Server prüfen
+
+Zieltyp **MCP-Server**: Adresse des MCP-Endpunkts (Streamable HTTP, meist `…/mcp`), Anmeldung z. B. „API-Schlüssel / Bearer-Token“ und den Schlüssel im Testkonto eintragen. „Prüfen“ zeigt Servername und Tools. Der Lauf prüft:
+
+- **Zugangsschutz**: Zugriff ohne oder mit falschem Schlüssel, fremde Herkunft (Origin/CORS), unverschlüsselte Verbindung
+- **Tool-Poisoning**: versteckte Anweisungen, unsichtbare Zeichen oder Verweise auf geheime Dateien in Tool-Beschreibungen und Server-Anweisungen
+- **Riskante Tools**: Tools, die ausführen, löschen, schreiben oder nach außen senden, ohne Kennzeichnung (`destructiveHint`/`readOnlyHint`)
+- **Parameter-Injection**: Pfad-Traversal, Befehls-, Vorlagen- und SQL-Injection, SSRF und Stacktraces in Fehlern
+- **Manipulierte Ausgaben**: Tool-Ergebnisse mit Anweisungen an den Agenten oder Bildern zu fremden Adressen
+
+Aufgerufen werden standardmäßig nur lesende Tools; schreibende nur, wenn es im Ziel ausdrücklich eingestellt ist.
+
+![MCP-Audit](docs/screenshots/mcp-audit.png)
+
 ## Aufbau
 
 ```

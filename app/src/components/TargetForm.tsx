@@ -23,6 +23,18 @@ const KINDS: { kind: TargetKind; label: string; hint: string }[] = [
     label: "HTTP-Endpunkt",
     hint: "Beliebiger JSON-Endpunkt, z. B. das Backend eines Chat-Widgets. Anfrage und Antwortfeld frei einstellbar.",
   },
+  {
+    kind: "mcp",
+    label: "MCP-Server",
+    hint: "Ein MCP-Server (Streamable HTTP), der Agenten Tools bereitstellt, z. B. https://server.de/mcp. Geprüft werden Anmeldung, Tool-Beschreibungen, Rechte, Parameter und Ausgaben.",
+  },
+];
+
+type ToolPolicy = "none" | "readonly" | "all";
+const POLICIES: { value: ToolPolicy; label: string }[] = [
+  { value: "readonly", label: "Nur lesende Tools aufrufen (empfohlen)" },
+  { value: "none", label: "Keine Tools aufrufen, nur Beschreibungen prüfen" },
+  { value: "all", label: "Alle Tools aufrufen, auch schreibende (nur auf Testsystemen!)" },
 ];
 
 const AUTHS: { kind: AuthKind; label: string }[] = [
@@ -108,6 +120,7 @@ export function TargetForm({
       saved: { password: a.has_password, token: a.has_token, totp: a.has_totp },
     })),
   );
+  const [toolPolicy, setToolPolicy] = useState<ToolPolicy>(initial?.mcp_tool_calls ?? "readonly");
   const [leakMarkers, setLeakMarkers] = useState((initial?.leak_markers ?? []).join("\n"));
   const [error, setError] = useState<string | null>(null);
 
@@ -132,6 +145,7 @@ export function TargetForm({
           model: orNull(model),
           method,
           delay: initial?.delay ?? 0.5,
+          mcp_tool_calls: toolPolicy,
           request_template: template,
           response_path: responsePath,
           verify_tls: !trustSelfSigned,
@@ -175,11 +189,14 @@ export function TargetForm({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         {KINDS.map((x) => (
           <button
             key={x.kind}
-            onClick={() => setKind(x.kind)}
+            onClick={() => {
+              setKind(x.kind);
+              if (x.kind === "mcp" && !initial && authKind === "none") setAuthKind("bearer");
+            }}
             className={`rounded-lg border px-2 py-1.5 text-xs ${
               kind === x.kind ? "border-cyan bg-cyan/10 text-cyan" : "border-line text-muted hover:text-text"
             }`}
@@ -232,9 +249,32 @@ export function TargetForm({
         <>
           <label className="block text-xs text-muted">
             Adresse (muss im Scope liegen)
-            <input className={`${input} font-mono`} value={url} onChange={(e) => setUrl(e.target.value)} />
+            <input
+              className={`${input} font-mono`}
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder={kind === "mcp" ? "https://server.de/mcp" : undefined}
+            />
           </label>
-          {kind === "openai_endpoint" ? (
+          {kind === "mcp" ? (
+            <label className="block text-xs text-muted">
+              Tool-Aufrufe beim Test
+              <select
+                className={input}
+                value={toolPolicy}
+                onChange={(e) => setToolPolicy(e.target.value as ToolPolicy)}
+              >
+                {POLICIES.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[11px]">
+                Lesend heißt: vom Server als readOnly gekennzeichnet oder Name beginnt mit get, list, search, read …
+              </span>
+            </label>
+          ) : kind === "openai_endpoint" ? (
             <label className="block text-xs text-muted">
               Modellname (falls verlangt)
               <input className={input} value={model} onChange={(e) => setModel(e.target.value)} />
@@ -336,7 +376,11 @@ export function TargetForm({
                     </p>
                     <label className="block text-xs text-muted">
                       Als Header senden (optional, z. B. X-OTP)
-                      <input className={`${input} font-mono`} value={mfaHeader} onChange={(e) => setMfaHeader(e.target.value)} />
+                      <input
+                        className={`${input} font-mono`}
+                        value={mfaHeader}
+                        onChange={(e) => setMfaHeader(e.target.value)}
+                      />
                     </label>
                     <label className="block text-xs text-muted">
                       Zweiter Login-Schritt: Adresse (optional)
@@ -351,7 +395,11 @@ export function TargetForm({
                       <div className="grid grid-cols-3 gap-2">
                         <label className="col-span-2 block text-xs text-muted">
                           Anfrage ({"{{code}}"}, {"{{challenge}}"}, {"{{username}}"})
-                          <input className={`${input} font-mono`} value={mfaBody} onChange={(e) => setMfaBody(e.target.value)} />
+                          <input
+                            className={`${input} font-mono`}
+                            value={mfaBody}
+                            onChange={(e) => setMfaBody(e.target.value)}
+                          />
                         </label>
                         <label className="block text-xs text-muted">
                           Challenge aus Schritt 1
@@ -384,8 +432,10 @@ export function TargetForm({
             </button>
           </div>
           <p className="mb-2 text-[11px] text-muted">
-            Am besten eigene Testkonten. Mit zwei Konten samt Kennung und privater Angabe prüft die App, ob ein Konto an
-            die Daten des anderen kommt. Passwörter und Tokens landen im Schlüsselbund.
+            {kind === "mcp" ? "Zugang zum MCP-Server. Schlüssel landen im Schlüsselbund." : ""}
+            {kind !== "mcp" && "Am besten eigene Testkonten."}{" "}
+            {kind !== "mcp" &&
+              "Mit zwei Konten samt Kennung und privater Angabe prüft die App, ob ein Konto an die Daten des anderen kommt. Passwörter und Tokens landen im Schlüsselbund."}
           </p>
           <div className="space-y-2">
             {list.map((a, i) => (
@@ -424,7 +474,9 @@ export function TargetForm({
                     className={`${small} col-span-2`}
                     value={a.totp_secret}
                     onChange={(e) => update(i, { totp_secret: e.target.value })}
-                    placeholder={a.saved?.totp ? SAVED : "TOTP-Geheimnis (Base32, aus dem QR-Code der Authenticator-App)"}
+                    placeholder={
+                      a.saved?.totp ? SAVED : "TOTP-Geheimnis (Base32, aus dem QR-Code der Authenticator-App)"
+                    }
                   />
                 )}
                 {(authKind === "bearer" || authKind === "header") && (
@@ -436,34 +488,38 @@ export function TargetForm({
                     placeholder={a.saved?.token ? SAVED : "API-Schlüssel / Token"}
                   />
                 )}
-                <input
-                  className={small}
-                  value={a.identifier}
-                  onChange={(e) => update(i, { identifier: e.target.value })}
-                  placeholder="Kennung (z. B. E-Mail)"
-                />
-                <div className="flex gap-1">
-                  <input
-                    className={small}
-                    value={a.marker}
-                    onChange={(e) => update(i, { marker: e.target.value })}
-                    placeholder="Private Angabe (z. B. IBAN)"
-                  />
-                  <button
-                    onClick={() => setAccounts(list.filter((_, j) => j !== i))}
-                    className="text-muted hover:text-red"
-                    title="Konto entfernen"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
+                {kind !== "mcp" && (
+                  <>
+                    <input
+                      className={small}
+                      value={a.identifier}
+                      onChange={(e) => update(i, { identifier: e.target.value })}
+                      placeholder="Kennung (z. B. E-Mail)"
+                    />
+                    <div className="flex gap-1">
+                      <input
+                        className={small}
+                        value={a.marker}
+                        onChange={(e) => update(i, { marker: e.target.value })}
+                        placeholder="Private Angabe (z. B. IBAN)"
+                      />
+                      <button
+                        onClick={() => setAccounts(list.filter((_, j) => j !== i))}
+                        className="text-muted hover:text-red"
+                        title="Konto entfernen"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {kind !== "model" && (
+      {kind !== "model" && kind !== "mcp" && (
         <label className="block text-xs text-muted">
           Geschützte Texte aus dem System-Prompt (einer pro Zeile, dürfen nie in einer Antwort stehen)
           <textarea

@@ -90,10 +90,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 /** Abonniert Live-Events; verbindet sich bei Abbruch automatisch neu. */
-export function subscribe(
-  onEvent: (e: EngineEvent) => void,
-  onStatus: (online: boolean) => void,
-): () => void {
+export function subscribe(onEvent: (e: EngineEvent) => void, onStatus: (online: boolean) => void): () => void {
   let ws: WebSocket | null = null;
   let stopped = false;
   let retry: ReturnType<typeof setTimeout> | undefined;

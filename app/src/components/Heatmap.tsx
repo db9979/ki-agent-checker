@@ -42,7 +42,11 @@ export function Heatmap({ rows }: { rows: HeatRow[] }) {
                       className={`flex h-10 items-center justify-center rounded-md text-xs font-semibold tabular-nums ${
                         active && rate && rate > 0.5 ? "glow-red" : ""
                       }`}
-                      title={active ? `${row.label}: ${rate === null ? "noch nicht getestet" : `${Math.round(rate * 100)} % erfolgreiche Angriffe`}` : ""}
+                      title={
+                        active
+                          ? `${row.label}: ${rate === null ? "noch nicht getestet" : `${Math.round(rate * 100)} % erfolgreiche Angriffe`}`
+                          : ""
+                      }
                     >
                       {active && rate !== null ? `${Math.round(rate * 100)}%` : active ? "…" : ""}
                     </motion.div>

@@ -24,7 +24,8 @@ body,
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 600px at 80% -10%, #1b1f4a55, transparent),
+  background:
+    radial-gradient(1200px 600px at 80% -10%, #1b1f4a55, transparent),
     radial-gradient(900px 500px at -10% 110%, #06404f55, transparent), var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
@@ -39,16 +40,20 @@ body {
 }
 
 .glow-red {
-  box-shadow: 0 0 0 1px #f43f5e55, 0 0 24px #f43f5e33;
+  box-shadow:
+    0 0 0 1px #f43f5e55,
+    0 0 24px #f43f5e33;
 }
 
 .glow-cyan {
-  box-shadow: 0 0 0 1px #22d3ee44, 0 0 24px #22d3ee22;
+  box-shadow:
+    0 0 0 1px #22d3ee44,
+    0 0 24px #22d3ee22;
 }
 
 .grid-bg {
-  background-image: linear-gradient(#1e2a4433 1px, transparent 1px),
-    linear-gradient(90deg, #1e2a4433 1px, transparent 1px);
+  background-image:
+    linear-gradient(#1e2a4433 1px, transparent 1px), linear-gradient(90deg, #1e2a4433 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
@@ -120,14 +125,18 @@ body {
 @keyframes hud-glitch {
   0% {
     transform: translate(0);
-    text-shadow: 2px 0 #f43f5e, -2px 0 #22d3ee;
+    text-shadow:
+      2px 0 #f43f5e,
+      -2px 0 #22d3ee;
   }
   25% {
     transform: translate(-3px, 1px) skewX(-6deg);
   }
   50% {
     transform: translate(3px, -1px);
-    text-shadow: -3px 0 #f43f5e, 3px 0 #22d3ee;
+    text-shadow:
+      -3px 0 #f43f5e,
+      3px 0 #22d3ee;
   }
   75% {
     transform: translate(-1px, 2px) skewX(4deg);

@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, 
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from . import __version__, providers
+from . import __version__, mcp, providers
 from . import attacks as attack_lib
 from .demo import run_demo
 from .events import EventHub
@@ -276,6 +276,23 @@ def create_app(
             raise HTTPException(404, "Ziel nicht gefunden")
         provider = store.get_provider(target.provider_id) if target.provider_id else None
         codes = data.mfa_codes if data else {}
+        if target.kind == TargetKind.MCP:
+            start = time.perf_counter()
+            try:
+                client, tools = await mcp.connect(target, keys, codes)
+                await client.close()
+            except Exception as exc:  # noqa: BLE001
+                return ConnectionResult(ok=False, error=providers.describe_error(exc))
+            names = ", ".join(str(t.get("name")) for t in tools[:12])
+            info = client.server_info
+            return ConnectionResult(
+                ok=True,
+                latency_ms=int((time.perf_counter() - start) * 1000),
+                reply=(
+                    f"MCP-Server „{info.get('name', '?')}“ {info.get('version', '')}, "
+                    f"{len(tools)} Tools: {names or 'keine'}"
+                )[:300],
+            )
         convo = Conversations(
             RunConfig(target=target, modules=[], provider=provider, mfa_codes=codes), keys
         )
@@ -325,8 +342,9 @@ def create_app(
             raise HTTPException(422, "Projekt des Ziels fehlt")
         if target.url and not in_scope(target.url, project.scope):
             raise HTTPException(403, "Das Ziel liegt nicht im Scope des Projekts")
-        modules = data.modules or attack_lib.MODULE_KEYS
-        unknown = set(modules) - set(attack_lib.MODULE_KEYS)
+        known = mcp.MCP_KEYS if target.kind == TargetKind.MCP else attack_lib.MODULE_KEYS
+        modules = data.modules or known
+        unknown = set(modules) - set(known)
         if unknown:
             raise HTTPException(422, f"Unbekannte Module: {', '.join(sorted(unknown))}")
         provider = store.get_provider(target.provider_id) if target.provider_id else None
@@ -352,7 +370,21 @@ def create_app(
             project_id=project.id,
             mfa_codes=data.mfa_codes,
         )
-        task = asyncio.create_task(run_target(hub, store, keys, cfg, run_id=run_id))
+        if target.kind == TargetKind.MCP:
+            task = asyncio.create_task(
+                mcp.run_mcp(
+                    hub,
+                    store,
+                    keys,
+                    target,
+                    modules,
+                    project_id=project.id,
+                    mfa_codes=data.mfa_codes,
+                    run_id=run_id,
+                )
+            )
+        else:
+            task = asyncio.create_task(run_target(hub, store, keys, cfg, run_id=run_id))
         tasks[run_id] = task
         task.add_done_callback(lambda _: tasks.pop(run_id, None))
         return {"run_id": run_id}
@@ -377,8 +409,22 @@ def create_app(
                 "attacks": len(m.attacks),
                 "needs_accounts": m.needs_accounts,
                 "title": m.title,
+                "target": "agent",
             }
             for m in attack_lib.LIBRARY
+        ] + [
+            {
+                "key": m.key,
+                "label": m.label,
+                "owasp": m.owasp,
+                "severity": m.severity.value,
+                "attacks": 0,
+                "needs_accounts": 0,
+                "title": m.title,
+                "target": "mcp",
+                "calls_tools": m.calls_tools,
+            }
+            for m in mcp.MCP_LIBRARY
         ]
 
     @app.get("/audit", dependencies=protected)

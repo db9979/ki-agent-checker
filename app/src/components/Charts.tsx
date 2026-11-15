@@ -23,7 +23,9 @@ const tooltipStyle = {
 /** Score über alle Läufe. */
 export function TrendChart({ data }: { data: { label: string; score: number }[] }) {
   if (data.length === 0) {
-    return <div className="flex h-full items-center justify-center text-sm text-muted">Noch keine abgeschlossenen Läufe</div>;
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted">Noch keine abgeschlossenen Läufe</div>
+    );
   }
   return (
     <ResponsiveContainer width="100%" height="100%">
