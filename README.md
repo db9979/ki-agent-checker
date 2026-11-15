@@ -93,6 +93,10 @@ Unter **Vergleich** stehen zwei Läufe desselben Ziels nebeneinander: Score vorh
 
 ![Vergleich](docs/screenshots/vergleich.png)
 
+### Mehrstufige Angriffe
+
+Wählt man im Testlauf ein **Angreifer-Modell**, kommt das Modul „Mehrstufig“ dazu. Das Modell spielt den Angreifer: Es fängt harmlos an, liest die Antworten des Ziels und steigert sich über bis zu 10 Nachrichten (Standard 5), wechselt bei Ablehnung die Taktik (Rollenspiel, Hypothese, Autorität, Teilschritte). Ziele: System-Prompt auslesen, ein Kennwort einschleusen, eine Phishing-Mail schreiben lassen und eine riskante Aktion auslösen. Erfolge werden wie bei den anderen Angriffen erkannt, mit Richter-Modell auch die unklaren Fälle. Als Angreifer eignen sich am besten lokale Modelle ohne strenge Filter, z. B. über Ollama.
+
 ### garak und Promptfoo
 
 Im Testlauf lassen sich statt der eigenen Angriffe auch [garak](https://github.com/NVIDIA/garak) oder [Promptfoo](https://www.promptfoo.dev/) wählen. Beide werden separat installiert (`pipx install garak`, auf dem Mac vorher `brew install pipx`; Promptfoo per `npx -y promptfoo@latest` mit Node.js 18+). Die App stellt für die Dauer des Laufs eine lokale Brücke bereit, über die der Scanner mit dem Ziel spricht. Anmeldung, 2FA, eigene Modelle und MCP-Tools funktionieren damit genauso wie bei den eigenen Angriffen. garak-Ergebnisse erscheinen live im Angriffspfad, Promptfoo-Ergebnisse nach dem Lauf. Befunde werden nach OWASP LLM Top 10 eingeordnet.

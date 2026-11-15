@@ -33,4 +33,6 @@ target:
 run:
   # modules: [mcp_auth, mcp_poisoning]   # Standard: alle passenden
   # judge: richter
+  # attacker: richter     # schreibt mehrstufige Angriffe
+  # max_turns: 5
   # scanner: {tool: garak, probes: promptinject}

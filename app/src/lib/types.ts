@@ -120,6 +120,7 @@ export interface AttackModuleInfo {
   severity: Severity;
   attacks: number;
   needs_accounts: number;
+  needs_attacker?: boolean;
   title: string;
   target: "agent" | "mcp";
   calls_tools?: boolean;

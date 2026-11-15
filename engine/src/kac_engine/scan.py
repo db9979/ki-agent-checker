@@ -160,6 +160,8 @@ def setup_from_config(engine: Engine, cfg: dict) -> tuple[str, dict]:
     run = dict(cfg.get("run") or {})
     if "judge" in run:
         run["judge_provider_id"] = provider_ref(run.pop("judge"))
+    if "attacker" in run:
+        run["attacker_provider_id"] = provider_ref(run.pop("attacker"))
     return target_id, run
 
 

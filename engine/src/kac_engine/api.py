@@ -76,6 +76,10 @@ class RunIn(BaseModel):
     scanner: ScannerIn | None = None
     modules: list[str] | None = None
     judge_provider_id: str | None = None
+    attacker_provider_id: str | None = Field(
+        default=None, description="Modell, das mehrstufige Angriffe schreibt"
+    )
+    max_turns: int = Field(default=5, ge=1, le=10)
     mfa_codes: dict[str, str] = Field(
         default_factory=dict, description="Von Hand eingegebene 2FA-Codes je Testkonto"
     )
@@ -388,6 +392,11 @@ def create_app(
         if target.kind == TargetKind.MODEL and not provider:
             raise HTTPException(422, "Für dieses Ziel ist kein Modell ausgewählt")
         judge = store.get_provider(data.judge_provider_id) if data.judge_provider_id else None
+        attacker = (
+            store.get_provider(data.attacker_provider_id) if data.attacker_provider_id else None
+        )
+        if data.attacker_provider_id and not attacker:
+            raise HTTPException(422, "Angreifer-Modell nicht gefunden")
         run_id = uuid.uuid4().hex[:12]
         store.audit(
             "run.started",
@@ -404,6 +413,8 @@ def create_app(
             modules=modules,
             provider=provider,
             judge=judge,
+            attacker=attacker,
+            max_turns=data.max_turns,
             project_id=project.id,
             mfa_codes=data.mfa_codes,
         )
@@ -628,6 +639,7 @@ def create_app(
                 "severity": m.severity.value,
                 "attacks": len(m.attacks),
                 "needs_accounts": m.needs_accounts,
+                "needs_attacker": m.needs_attacker,
                 "title": m.title,
                 "target": "agent",
                 "skill": m.key.startswith("skill:"),
