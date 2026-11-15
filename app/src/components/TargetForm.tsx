@@ -46,6 +46,7 @@ interface AccountDraft {
 }
 
 type Method = "POST" | "PUT" | "GET";
+type MfaMode = "none" | "totp" | "manual";
 const SAVED = "•••• gespeichert, leer lassen = behalten";
 
 const emptyAccount = (n: number): AccountDraft => ({
@@ -89,6 +90,11 @@ export function TargetForm({
     initial?.auth.login_body ?? '{"username": "{{username}}", "password": "{{password}}"}',
   );
   const [tokenPath, setTokenPath] = useState(initial ? (initial.auth.token_path ?? "") : "token");
+  const [mfa, setMfa] = useState<MfaMode>(initial?.auth.mfa ?? "none");
+  const [mfaHeader, setMfaHeader] = useState(initial?.auth.mfa_header ?? "");
+  const [mfaUrl, setMfaUrl] = useState(initial?.auth.mfa_url ?? "");
+  const [mfaBody, setMfaBody] = useState(initial?.auth.mfa_body ?? '{"code": "{{code}}"}');
+  const [mfaChallenge, setMfaChallenge] = useState(initial?.auth.mfa_challenge_path ?? "");
   const [accounts, setAccounts] = useState<AccountDraft[]>(
     (initial?.accounts ?? []).map((a) => ({
       name: a.name,
@@ -137,6 +143,11 @@ export function TargetForm({
             token_path: orNull(tokenPath),
             token_header: "Authorization",
             token_prefix: "Bearer ",
+            mfa,
+            mfa_header: mfa === "none" ? null : orNull(mfaHeader),
+            mfa_url: mfa === "none" ? null : orNull(mfaUrl),
+            mfa_body: mfaBody,
+            mfa_challenge_path: orNull(mfaChallenge),
           },
           accounts: list.map((a) => ({
             name: a.name,
@@ -290,7 +301,7 @@ export function TargetForm({
                   />
                 </label>
                 <label className="block text-xs text-muted">
-                  Login-Anfrage ({"{{username}}"}, {"{{password}}"}, {"{{totp}}"})
+                  Login-Anfrage ({"{{username}}"}, {"{{password}}"}, {"{{code}}"} für 2FA)
                   <input
                     className={`${input} font-mono`}
                     value={loginBody}
@@ -305,6 +316,56 @@ export function TargetForm({
                     onChange={(e) => setTokenPath(e.target.value)}
                   />
                 </label>
+              </div>
+            )}
+            {authKind !== "none" && (
+              <div className="mt-3 space-y-2 border-t border-line pt-3">
+                <label className="block text-xs text-muted">
+                  Zweiter Faktor (2FA)
+                  <select className={input} value={mfa} onChange={(e) => setMfa(e.target.value as MfaMode)}>
+                    <option value="none">Kein 2FA</option>
+                    <option value="totp">Authenticator-App (TOTP): Code automatisch aus dem Geheimnis je Konto</option>
+                    <option value="manual">Code bei jedem Prüfen und Lauf von Hand eingeben (SMS, Mail, App)</option>
+                  </select>
+                </label>
+                {mfa !== "none" && (
+                  <>
+                    <p className="text-[11px] text-muted">
+                      Wohin mit dem Code? In der Login-Anfrage über {"{{code}}"}, als eigener Header und/oder in einem
+                      zweiten Login-Schritt. Nur Nötiges ausfüllen.
+                    </p>
+                    <label className="block text-xs text-muted">
+                      Als Header senden (optional, z. B. X-OTP)
+                      <input className={`${input} font-mono`} value={mfaHeader} onChange={(e) => setMfaHeader(e.target.value)} />
+                    </label>
+                    <label className="block text-xs text-muted">
+                      Zweiter Login-Schritt: Adresse (optional)
+                      <input
+                        className={`${input} font-mono`}
+                        value={mfaUrl}
+                        onChange={(e) => setMfaUrl(e.target.value)}
+                        placeholder="https://agent.firma.de/api/login/2fa"
+                      />
+                    </label>
+                    {mfaUrl && (
+                      <div className="grid grid-cols-3 gap-2">
+                        <label className="col-span-2 block text-xs text-muted">
+                          Anfrage ({"{{code}}"}, {"{{challenge}}"}, {"{{username}}"})
+                          <input className={`${input} font-mono`} value={mfaBody} onChange={(e) => setMfaBody(e.target.value)} />
+                        </label>
+                        <label className="block text-xs text-muted">
+                          Challenge aus Schritt 1
+                          <input
+                            className={`${input} font-mono`}
+                            value={mfaChallenge}
+                            onChange={(e) => setMfaChallenge(e.target.value)}
+                            placeholder="z. B. challenge_id"
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -358,12 +419,12 @@ export function TargetForm({
                     />
                   </>
                 )}
-                {authKind === "login" && (
+                {mfa === "totp" && (
                   <input
                     className={`${small} col-span-2`}
                     value={a.totp_secret}
                     onChange={(e) => update(i, { totp_secret: e.target.value })}
-                    placeholder={a.saved?.totp ? SAVED : "TOTP-Geheimnis für 2FA (optional)"}
+                    placeholder={a.saved?.totp ? SAVED : "TOTP-Geheimnis (Base32, aus dem QR-Code der Authenticator-App)"}
                   />
                 )}
                 {(authKind === "bearer" || authKind === "header") && (

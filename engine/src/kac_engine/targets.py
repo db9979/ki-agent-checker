@@ -60,6 +60,21 @@ class AuthConfig(BaseModel):
     )
     token_header: str = "Authorization"
     token_prefix: str = "Bearer "
+    # Zweiter Faktor, für jede Anmeldeart
+    mfa: Literal["none", "totp", "manual"] = Field(
+        default="none",
+        description="totp: Code aus dem TOTP-Geheimnis des Kontos; manual: Code wird beim Start eingegeben",
+    )
+    mfa_header: str | None = Field(
+        default=None, description="Code zusätzlich als Header senden, z. B. X-OTP"
+    )
+    mfa_url: str | None = Field(
+        default=None, description="Zweiter Login-Schritt, an den der Code geht"
+    )
+    mfa_body: str = '{"code": "{{code}}"}'
+    mfa_challenge_path: str | None = Field(
+        default=None, description="Pfad zur Challenge-ID in der Antwort des ersten Schritts"
+    )
 
 
 class AccountIn(BaseModel):
@@ -239,11 +254,48 @@ class HttpSession:
     async def close(self) -> None:
         await self.client.aclose()
 
+    def _code(self) -> str:
+        """Aktueller 2FA-Code: aus dem TOTP-Geheimnis berechnet oder von Hand eingegeben."""
+        mode = self.target.auth.mfa
+        who = f" für {self.account.name}" if self.account else ""
+        if mode == "totp":
+            secret = self.secrets.get("totp_secret")
+            if not secret:
+                raise TargetError(f"TOTP-Geheimnis{who} fehlt")
+            return totp(secret)
+        if mode == "manual":
+            code = (self.secrets.get("mfa_code") or "").strip()
+            if not code:
+                raise TargetError(f"2FA-Code{who} fehlt, bitte beim Start eingeben")
+            return code
+        # Ältere Ziele: TOTP-Geheimnis ohne ausdrücklichen Modus
+        secret = self.secrets.get("totp_secret")
+        return totp(secret) if secret else ""
+
+    def _take_token(self, resp: httpx.Response) -> None:
+        auth = self.target.auth
+        try:
+            value = dig(resp.json(), auth.token_path)
+        except ValueError as exc:
+            raise TargetError("Login-Antwort ist kein JSON") from exc
+        if not value:
+            raise TargetError(f"Kein Token unter „{auth.token_path}“ in der Login-Antwort")
+        self.headers[auth.token_header] = f"{auth.token_prefix}{value}"
+
     async def login(self) -> None:
         auth = self.target.auth
         token = self.secrets.get("token")
         username = self.account.username if self.account else None
         password = self.secrets.get("password")
+        code = self._code()
+        values = {
+            "username": username or "",
+            "password": password or "",
+            "totp": code,
+            "code": code,
+        }
+        if code and auth.mfa_header:
+            self.headers[auth.mfa_header] = code
         if auth.kind == AuthKind.BEARER:
             if not token:
                 raise TargetError("Für dieses Konto ist kein Token hinterlegt")
@@ -258,30 +310,46 @@ class HttpSession:
         elif auth.kind == AuthKind.LOGIN:
             if not auth.login_url:
                 raise TargetError("Login-Adresse fehlt")
-            totp_secret = self.secrets.get("totp_secret")
-            body = render(
-                auth.login_body,
-                {
-                    "username": username or "",
-                    "password": password or "",
-                    "totp": totp(totp_secret) if totp_secret else "",
-                },
-            )
             resp = await self.client.post(
-                auth.login_url, content=body, headers={"Content-Type": "application/json"}
+                auth.login_url,
+                content=render(auth.login_body, values),
+                headers={"Content-Type": "application/json", **self.headers},
             )
             if resp.status_code >= 400:
                 raise TargetError(f"Anmeldung fehlgeschlagen: HTTP {resp.status_code}")
-            if auth.token_path:
-                try:
-                    value = dig(resp.json(), auth.token_path)
-                except ValueError as exc:
-                    raise TargetError("Login-Antwort ist kein JSON") from exc
-                if not value:
-                    raise TargetError(f"Kein Token unter „{auth.token_path}“ in der Login-Antwort")
-                self.headers[auth.token_header] = f"{auth.token_prefix}{value}"
+            if auth.mfa_url:
+                await self._second_step(resp, values)
+            elif auth.token_path:
+                self._take_token(resp)
             # sonst: Sitzungs-Cookie, das der Client automatisch mitschickt
+        if auth.kind != AuthKind.LOGIN and auth.mfa_url:
+            await self._second_step(None, values)
         self.logged_in = True
+
+    async def _second_step(self, first: httpx.Response | None, values: dict[str, str]) -> None:
+        """Zweiter Login-Schritt: Code (und ggf. Challenge aus Schritt 1) an die 2FA-Adresse."""
+        auth = self.target.auth
+        if not values["code"]:
+            raise TargetError("Für den zweiten Login-Schritt ist kein 2FA-Code eingerichtet")
+        challenge = ""
+        if first is not None and auth.mfa_challenge_path:
+            try:
+                challenge = str(dig(first.json(), auth.mfa_challenge_path) or "")
+            except ValueError:
+                challenge = ""
+            if not challenge:
+                raise TargetError(
+                    f"Keine Challenge unter „{auth.mfa_challenge_path}“ in der Login-Antwort"
+                )
+        resp = await self.client.post(
+            auth.mfa_url or "",
+            content=render(auth.mfa_body, {**values, "challenge": challenge}),
+            headers={"Content-Type": "application/json", **self.headers},
+        )
+        if resp.status_code >= 400:
+            raise TargetError(f"2FA-Schritt fehlgeschlagen: HTTP {resp.status_code}")
+        if auth.token_path:
+            self._take_token(resp)
 
     async def send(self, messages: list[dict]) -> str:
         if not self.logged_in:

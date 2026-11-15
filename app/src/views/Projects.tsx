@@ -22,6 +22,37 @@ const input = "w-full rounded-lg border border-line bg-[#0b1222] px-3 py-2 text-
 
 const KIND_ICON = { model: Bot, openai_endpoint: Plug, http: Globe } as const;
 
+function CodeInputs({
+  names,
+  codes,
+  onChange,
+}: {
+  names: string[];
+  codes: Record<string, string>;
+  onChange: (c: Record<string, string>) => void;
+}) {
+  return (
+    <div className="space-y-1.5 rounded-lg border border-amber/40 bg-amber/5 p-2">
+      <p className="text-[11px] text-amber">
+        2FA-Code eingeben (wird nur für diese Anmeldung verwendet, nicht gespeichert)
+      </p>
+      {names.map((n) => (
+        <label key={n} className="flex items-center gap-2 text-xs text-muted">
+          <span className="w-28 truncate">{n || "Code"}</span>
+          <input
+            className="flex-1 rounded-md border border-line bg-[#0b1222] px-2 py-1 font-mono text-xs tracking-widest outline-none focus:border-cyan"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="123456"
+            value={codes[n] ?? ""}
+            onChange={(e) => onChange({ ...codes, [n]: e.target.value.trim() })}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: () => void; onClose: () => void }) {
   const { data: modules } = useApi<AttackModuleInfo[]>("/attack-modules");
   const { data: providers } = useApi<Provider[]>("/providers");
@@ -29,6 +60,10 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
   const [judge, setJudge] = useState("");
   const [error, setError] = useState<string | null>(null);
   const pairs = target.accounts.filter((a) => a.identifier && a.marker).length;
+  const manual = target.auth.mfa === "manual";
+  const names = target.accounts.length ? target.accounts.map((a) => a.name) : [""];
+  const [codes, setCodes] = useState<Record<string, string>>({});
+  const missingCode = manual && names.some((n) => !codes[n]);
 
   const start = async () => {
     setError(null);
@@ -39,6 +74,7 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
           target_id: target.id,
           modules: (modules ?? []).map((m) => m.key).filter((k) => !off.has(k)),
           judge_provider_id: judge || null,
+          mfa_codes: manual ? codes : {},
         }),
       });
       onStarted();
@@ -95,10 +131,12 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
           ))}
         </select>
       </label>
+      {manual && <CodeInputs names={names} codes={codes} onChange={setCodes} />}
       {error && <p className="text-xs text-red">{error}</p>}
       <button
         onClick={start}
-        className="glow-red flex w-full items-center justify-center gap-2 rounded-lg bg-red/15 py-1.5 text-sm font-medium text-red"
+        disabled={missingCode}
+        className="glow-red disabled:opacity-40 flex w-full items-center justify-center gap-2 rounded-lg bg-red/15 py-1.5 text-sm font-medium text-red"
       >
         <Crosshair size={14} /> Angriff starten
       </button>
@@ -121,9 +159,27 @@ function TargetRow({
   const [check, setCheck] = useState<ConnectionResult | "busy" | null>(null);
   const [running, setRunning] = useState(false);
   const Icon = KIND_ICON[t.kind];
+  const manual = t.auth.mfa === "manual";
+  const first = t.accounts[0]?.name ?? "";
+  const [asking, setAsking] = useState(false);
+  const [codes, setCodes] = useState<Record<string, string>>({});
   const test = async () => {
+    if (manual && !codes[first]) {
+      setAsking(true);
+      return;
+    }
+    setAsking(false);
     setCheck("busy");
-    setCheck(await api<ConnectionResult>(`/targets/${t.id}/check`, { method: "POST" }));
+    try {
+      setCheck(
+        await api<ConnectionResult>(`/targets/${t.id}/check`, {
+          method: "POST",
+          body: JSON.stringify({ mfa_codes: manual ? codes : {} }),
+        }),
+      );
+    } finally {
+      setCodes({});
+    }
   };
   const remove = async () => {
     await api(`/targets/${t.id}`, { method: "DELETE" });
@@ -176,6 +232,20 @@ function TargetRow({
             <XCircle size={12} className="mt-0.5 shrink-0" />
           )}
           <span className="line-clamp-2">{check.ok ? `${check.latency_ms} ms · „${check.reply}“` : check.error}</span>
+        </div>
+      )}
+      {asking && (
+        <div className="mt-2 flex items-end gap-2">
+          <div className="flex-1">
+            <CodeInputs names={[first]} codes={codes} onChange={setCodes} />
+          </div>
+          <button
+            onClick={test}
+            disabled={!codes[first]}
+            className="rounded-md bg-cyan/15 px-3 py-1.5 text-xs text-cyan disabled:opacity-40"
+          >
+            Prüfen
+          </button>
         </div>
       )}
       {running && <RunPanel target={t} onStarted={onRunStarted} onClose={() => setRunning(false)} />}

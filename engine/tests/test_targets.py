@@ -9,7 +9,7 @@ from kac_engine.events import EventHub
 from kac_engine.keystore import SecretStore
 from kac_engine.runner import RunConfig, run_target
 from kac_engine.store import Store
-from kac_engine.targets import HttpSession, dig, in_scope, render, totp
+from kac_engine.targets import HttpSession, TargetError, dig, in_scope, render, totp
 
 
 def test_in_scope():
@@ -291,3 +291,88 @@ def test_wrong_path_suggests_endpoints(monkeypatch):
     with pytest.raises(TargetError) as err:
         asyncio.run(go())
     assert "/api/speak" in str(err.value) and "/health" not in str(err.value)
+
+
+def _two_step_server(expected_code):
+    def server(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/login":
+            body = json.loads(request.content)
+            if body == {"username": "anna", "password": "pw-a"}:
+                return httpx.Response(200, json={"challenge_id": "ch-1"})
+            return httpx.Response(401)
+        if path == "/login/2fa":
+            body = json.loads(request.content)
+            if body == {"challenge": "ch-1", "code": expected_code()}:
+                return httpx.Response(200, json={"token": "tok-anna"})
+            return httpx.Response(401)
+        if path == "/chat":
+            if request.headers.get("authorization") != "Bearer tok-anna":
+                return httpx.Response(401)
+            return httpx.Response(200, json={"reply": "hallo"})
+        if path == "/basic-chat":
+            ok = request.headers.get("x-otp") == expected_code() and request.headers[
+                "authorization"
+            ].startswith("Basic ")
+            return httpx.Response(200 if ok else 401, json={"reply": "basic ok"})
+        return httpx.Response(404)
+
+    return server
+
+
+def _target(**auth):
+    from datetime import UTC, datetime
+
+    from kac_engine.targets import Account, AuthConfig, Target
+
+    return Target(
+        id="t",
+        project_id="p",
+        name="x",
+        kind="http",
+        url=auth.pop("url", "https://bot.example/chat"),
+        auth=AuthConfig(**auth),
+        accounts=[Account(name="Anna", role="Nutzer", username="anna")],
+        created_at=datetime.now(UTC),
+    )
+
+
+async def _send(target, secrets):
+    session = HttpSession(target, target.accounts[0], secrets)
+    try:
+        return await session.send([{"role": "user", "content": "hi"}])
+    finally:
+        await session.close()
+
+
+async def test_two_step_login_with_manual_code(monkeypatch):
+    monkeypatch.setattr(
+        HttpSession, "transport", httpx.MockTransport(_two_step_server(lambda: "123456"))
+    )
+    target = _target(
+        kind="login",
+        login_url="https://bot.example/login",
+        mfa="manual",
+        mfa_url="https://bot.example/login/2fa",
+        mfa_body='{"challenge": "{{challenge}}", "code": "{{code}}"}',
+        mfa_challenge_path="challenge_id",
+        token_path="token",
+    )
+    assert await _send(target, {"password": "pw-a", "mfa_code": "123456"}) == "hallo"
+    with pytest.raises(TargetError, match="2FA-Code"):
+        await _send(target, {"password": "pw-a"})
+    with pytest.raises(TargetError, match="2FA-Schritt"):
+        await _send(target, {"password": "pw-a", "mfa_code": "000000"})
+
+
+async def test_basic_auth_with_totp_header(monkeypatch):
+    secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+    monkeypatch.setattr(
+        HttpSession, "transport", httpx.MockTransport(_two_step_server(lambda: totp(secret)))
+    )
+    target = _target(
+        kind="basic", url="https://bot.example/basic-chat", mfa="totp", mfa_header="X-OTP"
+    )
+    assert await _send(target, {"password": "pw-a", "totp_secret": secret}) == "basic ok"
+    with pytest.raises(TargetError, match="TOTP"):
+        await _send(target, {"password": "pw-a"})

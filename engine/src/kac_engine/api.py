@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import __version__, providers
 from . import attacks as attack_lib
@@ -59,6 +59,13 @@ class RunIn(BaseModel):
     target_id: str
     modules: list[str] | None = None
     judge_provider_id: str | None = None
+    mfa_codes: dict[str, str] = Field(
+        default_factory=dict, description="Von Hand eingegebene 2FA-Codes je Testkonto"
+    )
+
+
+class CheckIn(BaseModel):
+    mfa_codes: dict[str, str] = Field(default_factory=dict)
 
 
 class DemoRunIn(BaseModel):
@@ -174,7 +181,7 @@ def create_app(
         else:
             if not data.url:
                 raise HTTPException(422, "Adresse des Ziels fehlt")
-            for url in filter(None, [data.url, data.auth.login_url]):
+            for url in filter(None, [data.url, data.auth.login_url, data.auth.mfa_url]):
                 if not in_scope(url, project.scope):
                     raise HTTPException(
                         403,
@@ -262,13 +269,16 @@ def create_app(
         store.audit("target.deleted", {"id": target_id})
 
     @app.post("/targets/{target_id}/check", dependencies=protected)
-    async def check_target(target_id: str) -> ConnectionResult:
+    async def check_target(target_id: str, data: CheckIn | None = None) -> ConnectionResult:
         """Harmlose Testnachricht, prüft Erreichbarkeit und Anmeldung."""
         target = store.get_target(target_id)
         if not target:
             raise HTTPException(404, "Ziel nicht gefunden")
         provider = store.get_provider(target.provider_id) if target.provider_id else None
-        convo = Conversations(RunConfig(target=target, modules=[], provider=provider), keys)
+        codes = data.mfa_codes if data else {}
+        convo = Conversations(
+            RunConfig(target=target, modules=[], provider=provider, mfa_codes=codes), keys
+        )
         start = time.perf_counter()
         try:
             reply, _ = await convo.reply(
@@ -335,7 +345,12 @@ def create_app(
             },
         )
         cfg = RunConfig(
-            target=target, modules=modules, provider=provider, judge=judge, project_id=project.id
+            target=target,
+            modules=modules,
+            provider=provider,
+            judge=judge,
+            project_id=project.id,
+            mfa_codes=data.mfa_codes,
         )
         task = asyncio.create_task(run_target(hub, store, keys, cfg, run_id=run_id))
         tasks[run_id] = task

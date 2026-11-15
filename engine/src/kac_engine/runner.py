@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import attacks as lib
 from .demo import score
@@ -37,6 +37,9 @@ class RunConfig:
     provider: Provider | None = None  # nur für Ziele vom Typ model
     judge: Provider | None = None
     project_id: str | None = None
+    mfa_codes: dict[str, str] = field(
+        default_factory=dict
+    )  # von Hand eingegebene 2FA-Codes je Konto
 
 
 def plan(
@@ -69,10 +72,12 @@ class Conversations:
 
     def _secrets(self, account: Account | None) -> dict[str, str | None]:
         if not account:
-            return {}
-        return {
+            return {"mfa_code": self.cfg.mfa_codes.get("")}
+        values: dict[str, str | None] = {
             f: self.keys.get(secret_key(self.cfg.target.id, account.name, f)) for f in SECRET_FIELDS
         }
+        values["mfa_code"] = self.cfg.mfa_codes.get(account.name)
+        return values
 
     async def reply(self, account_idx: int, history: list[dict]) -> tuple[str, list[dict]]:
         t = self.cfg.target

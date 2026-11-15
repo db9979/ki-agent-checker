@@ -77,6 +77,11 @@ export interface AuthConfig {
   token_path: string | null;
   token_header: string;
   token_prefix: string;
+  mfa: "none" | "totp" | "manual";
+  mfa_header: string | null;
+  mfa_url: string | null;
+  mfa_body: string;
+  mfa_challenge_path: string | null;
 }
 
 export interface Account {
