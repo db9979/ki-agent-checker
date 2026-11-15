@@ -18,7 +18,7 @@ die Ergebnisse visualisiert und Gegenmaßnahmen vorschlägt. Selbst gehostete Mo
 | Engine | Python, FastAPI, SQLite, WebSocket für Live-Events |
 | Modelle | LiteLLM-Anbindung, Modellsuche für Ollama und OpenAI-kompatible Server, Verbindungstest, Schlüssel im System-Schlüsselbund |
 | Projekte | Scope-Liste, Berechtigungsbestätigung, Audit-Log |
-| Visualisierung | Dashboard mit Security-Score, Heatmap Modul × OWASP LLM Top 10, Radar, Score-Verlauf, 3D-Angriffsarena mit HUD, Angriffsgraph mit Datenstrom, Zeitleiste zum Abspielen eines Laufs |
+| Visualisierung | Dashboard mit Security-Score, Heatmap Modul × OWASP LLM Top 10, Radar, Score-Verlauf, Angriffspfad durch vier Schutzschichten mit Terminal-Protokoll, Angriffsgraph mit Datenstrom, Zeitleiste zum Abspielen eines Laufs |
 | Demo-Lauf | Vorbereiteter Lauf gegen einen fiktiven Kundenservice-Agenten, braucht kein Modell |
 | Ziele | Eigenes Modell mit System-Prompt und Honeypot-Tools, Agent mit OpenAI-kompatibler API oder beliebiger HTTP-Endpunkt (JSON-Vorlage) |
 | Anmeldung | API-Schlüssel, eigener Header, Basic Auth, Login-Aufruf mit Token oder Cookie, TOTP für 2FA, mehrere Testkonten mit Rollen |
@@ -33,22 +33,21 @@ die Ergebnisse visualisiert und Gegenmaßnahmen vorschlägt. Selbst gehostete Mo
 3. Mit **+ Ziel** das Ziel einrichten. Für Agenten hinter einer Anmeldung die Anmeldeart wählen und Testkonten
    anlegen. Mit zwei Konten samt Kennung (z. B. E-Mail) und privater Angabe (z. B. IBAN) prüft die App,
    ob ein Konto an die Daten des anderen kommt. Passwörter, Tokens und TOTP-Geheimnisse liegen im Schlüsselbund.
-4. **Prüfen** schickt eine harmlose Nachricht, **Testen** startet den Angriff. Der Lauf erscheint live in der Arena.
+4. **Prüfen** schickt eine harmlose Nachricht, **Testen** startet den Angriff. Der Lauf erscheint live im Angriffspfad.
 
 | Ziele und Testlauf | Echter Lauf mit Login und zwei Konten |
 | --- | --- |
 | ![Ziele](docs/screenshots/ziele.png) | ![Echter Lauf](docs/screenshots/echter-lauf.png) |
 
-![Angriffsarena](docs/screenshots/arena.gif)
+Die Live-Ansicht zeigt jeden Angriff als **Pfad durch vier Schutzschichten**: Eingabe-Schutz, Modell/Prompt,
+Tools & Daten, Außenwelt. Eine grüne Sperre zeigt, an welcher Schicht ein Angriff gestoppt wurde, ein roter Pfeil,
+wie weit er durchgebrochen ist. Darunter läuft das Gespräch im Terminal-Stil mit hervorgehobenen Tool-Aufrufen.
+Über die Zeitleiste lässt sich jeder Lauf erneut abspielen, vorspulen oder an eine Stelle springen.
 
-Die Live-Ansicht zeigt den Ziel-Agenten als Kern hinter einem Schutzschild. Jeder Angriff fliegt als
-Lichtgeschoss heran: abgewehrt prallt er ab, ein Durchbruch reißt das Schild auf, löst Alarm aus und lässt
-die missbrauchten Tools und Datenquellen rot glühen. Über die Zeitleiste lässt sich jeder Lauf erneut
-abspielen, vorspulen oder an eine Stelle springen, in der Arena und im Angriffsgraphen.
+Unten in der Seitenleiste schaltet **Effekte: voll / Leistungsmodus** Animationen und Leuchteffekte für
+schwache Geräte wie den uConsole herunter.
 
-Unten in der Seitenleiste schaltet **Effekte: voll / Leistungsmodus** zwischen voller Darstellung
-(Bloom, Partikel, Glitch) und einer sparsamen Variante für schwache Geräte wie den uConsole um.
-Auf kleinen Bildschirmen mit wenigen Kernen und bei „Bewegung reduzieren“ ist der Leistungsmodus voreingestellt.
+![Live-Angriff auf dem uConsole](docs/screenshots/live-uconsole.png)
 
 | Dashboard | Live-Angriff |
 | --- | --- |

@@ -67,26 +67,7 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
-/* Arena und HUD                                                       */
-
-.arena-label {
-  margin-top: 4px;
-  font: 500 10.5px/1 var(--font-mono);
-  letter-spacing: 0.04em;
-  color: #c4b5fd;
-  padding: 3px 7px;
-  border: 1px solid #a78bfa55;
-  border-radius: 6px;
-  background: #0b0f1fcc;
-  white-space: nowrap;
-  pointer-events: none;
-  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
-}
-.arena-label[data-hot="1"] {
-  color: #fecdd3;
-  border-color: #f43f5e;
-  box-shadow: 0 0 14px #f43f5e88;
-}
+/* HUD-Effekte                                                          */
 
 .hud-scanlines {
   pointer-events: none;
