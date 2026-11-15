@@ -414,6 +414,7 @@ async def run_scanner(
     target_id: str,
     project_id: str | None,
     run_id: str,
+    graph: dict | None = None,
 ) -> str:
     store.start_run(run_id, project_id, f"{label} · {cfg.tool}")
     await hub.publish("run.started", run_id, target=f"{label} · {cfg.tool}", total=0, modules=[])
@@ -455,6 +456,9 @@ async def run_scanner(
         await report_status(force=requests == 1, prompt=message[:300], reply=answer[:300])
         return answer
 
+    if graph:
+        store.save_run_graph(run_id, graph)
+        await hub.publish("run.graph", run_id, graph=graph)
     key = bridge.open(counted)
     bridge_url = f"{engine_url}/bridge/{key}"
     hits: list[Hit] = []

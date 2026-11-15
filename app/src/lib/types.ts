@@ -173,3 +173,39 @@ export interface CompareResult {
   rows: CompareRow[];
   complete: boolean;
 }
+
+export interface GraphNodeInfo {
+  id: string;
+  label: string;
+  sub: string;
+  kind: "attacker" | "agent" | "tool" | "data" | "external";
+  col: number;
+  icon: string;
+  group?: "read" | "write" | "out";
+}
+
+export interface GraphEdgeInfo {
+  id: string;
+  source: string;
+  target: string;
+  modules: string[];
+  prefixes: string[];
+  tool: string | null;
+  label: string | null;
+}
+
+export interface GraphData {
+  kind: "agent" | "mcp";
+  nodes: GraphNodeInfo[];
+  edges: GraphEdgeInfo[];
+}
+
+export interface GraphAttack {
+  id: string;
+  module: string;
+  tool: string | null;
+  tool_calls: string[];
+  success: boolean | undefined;
+  signal: string | undefined;
+  technique: string;
+}

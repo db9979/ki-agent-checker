@@ -18,7 +18,7 @@ die Ergebnisse visualisiert und Gegenmaßnahmen vorschlägt. Selbst gehostete Mo
 | Engine | Python, FastAPI, SQLite, WebSocket für Live-Events |
 | Modelle | LiteLLM-Anbindung, Modellsuche für Ollama und OpenAI-kompatible Server, Verbindungstest, Schlüssel im System-Schlüsselbund |
 | Projekte | Scope-Liste, Berechtigungsbestätigung, Audit-Log |
-| Visualisierung | Dashboard mit Security-Score, Heatmap Modul × OWASP LLM Top 10, Radar, Score-Verlauf, Angriffspfad durch vier Schutzschichten mit Terminal-Protokoll, Angriffsgraph mit Datenstrom, Zeitleiste zum Abspielen eines Laufs |
+| Visualisierung | Dashboard mit Security-Score, Heatmap Modul × OWASP LLM Top 10, Radar, Score-Verlauf, Angriffspfad durch vier Schutzschichten mit Terminal-Protokoll, Angriffsgraph aus dem echten Ziel (beim MCP-Server alle Tools nach Risiko gruppiert, live eingefärbt), Zeitleiste zum Abspielen eines Laufs |
 | Demo-Lauf | Vorbereiteter Lauf gegen einen fiktiven Kundenservice-Agenten, braucht kein Modell |
 | Ziele | Eigenes Modell mit System-Prompt und Honeypot-Tools, Agent mit OpenAI-kompatibler API oder beliebiger HTTP-Endpunkt (JSON-Vorlage) |
 | Anmeldung | API-Schlüssel, eigener Header, Basic Auth, Login-Aufruf mit Token oder Cookie, TOTP für 2FA, mehrere Testkonten mit Rollen |
