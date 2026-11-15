@@ -1,0 +1,131 @@
+import { motion } from "framer-motion";
+import { Play, ShieldAlert } from "lucide-react";
+import { useMemo } from "react";
+import { ModuleRadar, TrendChart } from "../components/Charts";
+import { Heatmap, type HeatRow } from "../components/Heatmap";
+import { ScoreGauge } from "../components/ScoreGauge";
+import { SeverityBars } from "../components/SeverityBars";
+import { MODULES } from "../lib/modules";
+import { liveScore, useRun } from "../lib/runStore";
+import type { Finding, RunSummary } from "../lib/types";
+import { useApi } from "../lib/useApi";
+import { OWASP_LABEL, SEVERITY_COLOR, SEVERITY_LABEL } from "../lib/ui";
+
+export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
+  const run = useRun();
+  const { data: runs } = useApi<RunSummary[]>("/runs", [run.status]);
+  const finished = (runs ?? []).filter((r) => r.status === "finished");
+  const last = finished.at(-1) ?? null;
+  const live = run.status !== "idle";
+
+  const score = live ? liveScore(run) : (last?.score ?? null);
+  const findings: Finding[] = live ? run.findings : (last?.findings ?? []);
+
+  const rows: HeatRow[] = useMemo(() => {
+    if (live) {
+      return run.modules.map((m) => ({ ...m, rate: m.attempts ? m.hits / m.attempts : null }));
+    }
+    return MODULES.map((m) => {
+      const f = last?.findings.find((x) => x.module === m.key);
+      return { ...m, attempts: last ? 1 : 0, rate: last ? (f?.success_rate ?? 0) : null };
+    });
+  }, [live, run.modules, last]);
+
+  const trend = finished.map((r, i) => ({ label: `#${i + 1}`, score: r.score ?? 0 }));
+  const radar = rows.map((r) => ({ module: r.label, resistance: r.rate === null ? 100 : Math.round((1 - r.rate) * 100) }));
+
+  return (
+    <div className="grid grid-cols-12 gap-4">
+      <header className="col-span-12 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <p className="text-sm text-muted">{live ? run.target : last ? last.target : "Noch kein Testlauf"}</p>
+        </div>
+        <button
+          onClick={onStartDemo}
+          disabled={run.status === "running"}
+          className="glow-cyan flex items-center gap-2 rounded-xl bg-cyan/15 px-4 py-2 text-sm font-medium text-cyan transition hover:bg-cyan/25 disabled:opacity-40"
+        >
+          <Play size={16} /> Demo-Lauf starten
+        </button>
+      </header>
+
+      <section className="panel col-span-12 flex flex-col items-center justify-center p-5 md:col-span-4">
+        <ScoreGauge score={score} />
+        {run.status === "running" && (
+          <div className="mt-4 w-full">
+            <div className="mb-1 flex justify-between text-xs text-muted">
+              <span>Lauf läuft</span>
+              <span className="tabular-nums">
+                {run.done}/{run.total}
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#0b1222]">
+              <motion.div className="h-full bg-cyan" animate={{ width: `${(run.done / Math.max(1, run.total)) * 100}%` }} />
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="panel col-span-12 p-5 md:col-span-4">
+        <h2 className="mb-4 text-sm font-semibold text-muted">Findings nach Schweregrad</h2>
+        <SeverityBars findings={findings} />
+      </section>
+
+      <section className="panel col-span-12 p-5 md:col-span-4">
+        <h2 className="mb-2 text-sm font-semibold text-muted">Widerstand pro Modul</h2>
+        <div className="h-52">
+          <ModuleRadar data={radar} />
+        </div>
+      </section>
+
+      <section className="panel col-span-12 p-5 lg:col-span-7">
+        <h2 className="mb-3 text-sm font-semibold text-muted">Angriffs-Heatmap · Modul × OWASP LLM Top 10</h2>
+        <Heatmap rows={rows} />
+      </section>
+
+      <section className="panel col-span-12 p-5 lg:col-span-5">
+        <h2 className="mb-3 text-sm font-semibold text-muted">Score-Verlauf</h2>
+        <div className="h-56">
+          <TrendChart data={trend} />
+        </div>
+      </section>
+
+      <section className="panel col-span-12 p-5">
+        <h2 className="mb-3 text-sm font-semibold text-muted">Findings und Gegenmaßnahmen</h2>
+        {findings.length === 0 ? (
+          <p className="text-sm text-muted">Keine Findings. Starte einen Demo-Lauf, um die Ansicht zu füllen.</p>
+        ) : (
+          <div className="space-y-3">
+            {findings.map((f, i) => (
+              <motion.div
+                key={f.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06 }}
+                className="rounded-xl border border-line bg-panel-2/60 p-4"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <ShieldAlert size={16} style={{ color: SEVERITY_COLOR[f.severity] }} />
+                  <span className="font-medium">{f.title}</span>
+                  <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${SEVERITY_COLOR[f.severity]}22`, color: SEVERITY_COLOR[f.severity] }}>
+                    {SEVERITY_LABEL[f.severity]}
+                  </span>
+                  <span className="rounded-md bg-violet/15 px-2 py-0.5 text-[11px] text-violet" title={OWASP_LABEL[f.owasp]}>
+                    {f.owasp}
+                  </span>
+                  {f.atlas && <span className="rounded-md bg-cyan/10 px-2 py-0.5 text-[11px] text-cyan">{f.atlas}</span>}
+                  <span className="ml-auto text-xs tabular-nums text-muted">{Math.round(f.success_rate * 100)} % erfolgreich</span>
+                </div>
+                <p className="mt-2 text-sm text-text/80">
+                  <span className="font-medium text-green">Gegenmaßnahme: </span>
+                  {f.remediation}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

@@ -1,0 +1,12 @@
+/** Testmodule des Grundgerüsts mit OWASP-LLM-Zuordnung. */
+export const MODULES = [
+  { key: "prompt_injection", label: "Prompt Injection", owasp: "LLM01" },
+  { key: "jailbreak", label: "Jailbreak", owasp: "LLM01" },
+  { key: "system_prompt_leak", label: "System-Prompt-Leak", owasp: "LLM07" },
+  { key: "data_exfiltration", label: "Datenabfluss", owasp: "LLM02" },
+  { key: "excessive_agency", label: "Tool-Missbrauch", owasp: "LLM06" },
+] as const;
+
+export function moduleLabel(key: string): string {
+  return MODULES.find((m) => m.key === key)?.label ?? key;
+}

@@ -1,0 +1,68 @@
+name: Desktop-Build
+
+# Baut Installer für Windows, macOS und Linux.
+# Läuft bei Pushes auf main, bei Tags (v*) und manuell, nicht bei jedem PR,
+# weil macOS- und Windows-Minuten auf GitHub teurer sind.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-22.04
+          - name: Windows
+            os: windows-latest
+          - name: macOS (Apple Silicon)
+            os: macos-latest
+          - name: macOS (Intel)
+            os: macos-13
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Systempakete (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      - name: Engine als Sidecar bauen
+        run: |
+          uv sync --project engine
+          uv run --project engine python scripts/build_sidecar.py
+
+      - name: Desktop-App bauen
+        working-directory: app
+        run: |
+          npm ci
+          npx tauri build --config src-tauri/tauri.release.conf.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ki-agent-checker-${{ matrix.os }}
+          path: |
+            app/src-tauri/target/release/bundle/**/*.msi
+            app/src-tauri/target/release/bundle/**/*.exe
+            app/src-tauri/target/release/bundle/**/*.dmg
+            app/src-tauri/target/release/bundle/**/*.AppImage
+            app/src-tauri/target/release/bundle/**/*.deb
+          if-no-files-found: warn
