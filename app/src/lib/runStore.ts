@@ -92,6 +92,19 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
     case "attack.started":
       return {
         ...s,
+        // Externe Scanner melden ihre Module erst unterwegs
+        modules: s.modules.some((m) => m.key === e.module)
+          ? s.modules
+          : [
+              ...s.modules,
+              {
+                key: e.module as string,
+                label: (e.module_label as string) ?? (e.module as string),
+                owasp: e.owasp as string,
+                attempts: 0,
+                hits: 0,
+              },
+            ],
         attacks: [
           ...s.attacks,
           {
@@ -128,6 +141,7 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
       return {
         ...s,
         done: e.done as number,
+        total: (e.total as number) || s.total,
         attacks: s.attacks.map((a) =>
           a.id === e.attack_id
             ? {

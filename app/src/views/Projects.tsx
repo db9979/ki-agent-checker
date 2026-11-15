@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
+import { loadScanner, saveScanner, ScannerOptions, type ScannerSettings } from "../components/ScannerOptions";
 import { TargetForm } from "../components/TargetForm";
 import { api } from "../lib/engine";
 import type { AttackModuleInfo, ConnectionResult, Project, Provider, Target } from "../lib/types";
@@ -68,6 +69,12 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
   const names = target.accounts.length ? target.accounts.map((a) => a.name) : [""];
   const [codes, setCodes] = useState<Record<string, string>>({});
   const missingCode = manual && names.some((n) => !codes[n]);
+  const [source, setSource] = useState<"own" | "garak" | "promptfoo">("own");
+  const [scanner, setScanner] = useState<ScannerSettings>(loadScanner("garak"));
+  const pick = (s: "own" | "garak" | "promptfoo") => {
+    setSource(s);
+    if (s !== "own") setScanner(loadScanner(s));
+  };
 
   const start = async () => {
     setError(null);
@@ -79,8 +86,10 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
           modules: (modules ?? []).map((m) => m.key).filter((k) => !off.has(k)),
           judge_provider_id: judge || null,
           mfa_codes: manual ? codes : {},
+          scanner: source === "own" ? null : scanner,
         }),
       });
+      if (source !== "own") saveScanner(scanner);
       onStarted();
     } catch (e) {
       setError(String((e as Error).message));
@@ -95,7 +104,29 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
           <X size={14} />
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-1">
+      {!isMcp && (
+        <div className="grid grid-cols-3 gap-1">
+          {(
+            [
+              ["own", "Eigene Angriffe"],
+              ["garak", "garak"],
+              ["promptfoo", "Promptfoo"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => pick(key)}
+              className={`rounded-md border px-2 py-1 text-[11px] ${
+                source === key ? "border-red/60 bg-red/10 text-red" : "border-line text-muted hover:text-text"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {source !== "own" && <ScannerOptions value={scanner} onChange={setScanner} />}
+      <div className={`grid grid-cols-2 gap-1 ${source !== "own" ? "hidden" : ""}`}>
         {(modules ?? []).map((m) => {
           const unavailable = m.needs_accounts > pairs || (noCalls && !!m.calls_tools);
           return (
@@ -128,7 +159,7 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
           );
         })}
       </div>
-      {!isMcp && (
+      {!isMcp && source === "own" && (
         <label className="block text-xs text-muted">
           Richter-Modell (bewertet unklare Antworten, optional)
           <select
