@@ -16,14 +16,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux
+          - name: Linux (x64)
             os: ubuntu-22.04
+          # ARM64, z. B. ClockworkPi uConsole (CM4/CM5) mit Raspberry Pi OS oder Debian bookworm.
+          # Gebaut auf Ubuntu 22.04 (glibc 2.35), damit es auf bookworm (glibc 2.36) läuft.
+          - name: Linux (ARM64, uConsole)
+            os: ubuntu-22.04-arm
           - name: Windows
             os: windows-latest
           - name: macOS (Apple Silicon)
             os: macos-latest
-          - name: macOS (Intel)
-            os: macos-13
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -52,13 +54,36 @@ jobs:
 
       - name: Desktop-App bauen
         working-directory: app
+        shell: bash
         run: |
           npm ci
-          npx tauri build --config src-tauri/tauri.release.conf.json
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            # .deb für Raspberry Pi OS/Debian, AppImage für andere Distributionen
+            npx tauri build --config src-tauri/tauri.release.conf.json --bundles deb,appimage
+          else
+            npx tauri build --config src-tauri/tauri.release.conf.json
+          fi
+
+      # Startet die Engine aus dem fertigen Paket. Fängt z. B. Signaturprobleme ab,
+      # bei denen macOS das eingebettete Python nicht laden lässt.
+      - name: Engine im Paket starten (Smoke-Test)
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            macOS) BIN="$(ls -d app/src-tauri/target/release/bundle/macos/*.app)/Contents/MacOS/kac-engine" ;;
+            Windows) BIN="app/src-tauri/target/release/kac-engine.exe" ;;
+            *) BIN="app/src-tauri/target/release/kac-engine" ;;
+          esac
+          "$BIN" serve --no-auth --port 8799 --data-dir "$RUNNER_TEMP/kac" > engine.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8799/health; then echo; echo "Engine läuft"; exit 0; fi
+            sleep 2
+          done
+          echo "Engine startet nicht:"; cat engine.log; exit 1
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ki-agent-checker-${{ matrix.os }}
+          name: ki-agent-checker-${{ matrix.os }}-${{ runner.arch }}
           path: |
             app/src-tauri/target/release/bundle/**/*.msi
             app/src-tauri/target/release/bundle/**/*.exe

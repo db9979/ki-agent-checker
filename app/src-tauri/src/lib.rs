@@ -17,6 +17,13 @@ struct EngineInfo {
 struct Engine {
     info: Mutex<Option<EngineInfo>>,
     child: Mutex<Option<CommandChild>>,
+    /// Letzte Ausgaben des Sidecars, damit Startfehler in der Oberfläche sichtbar sind
+    log: std::sync::Arc<Mutex<Vec<String>>>,
+}
+
+#[tauri::command]
+fn engine_log(engine: State<'_, Engine>) -> Vec<String> {
+    engine.log.lock().map(|l| l.clone()).unwrap_or_default()
 }
 
 #[tauri::command]
@@ -31,15 +38,21 @@ fn engine_info(engine: State<'_, Engine>) -> Result<EngineInfo, String> {
 
 /// Entwicklung: Engine läuft separat (`npm run dev:engine`), ohne Token.
 #[cfg(debug_assertions)]
-fn start_engine(_app: &tauri::AppHandle) -> Result<(EngineInfo, Option<CommandChild>), String> {
+fn start_engine(
+    _app: &tauri::AppHandle,
+    _log: std::sync::Arc<Mutex<Vec<String>>>,
+) -> Result<(EngineInfo, Option<CommandChild>), String> {
     let url = std::env::var("KAC_ENGINE_URL").unwrap_or_else(|_| "http://127.0.0.1:8765".into());
     Ok((EngineInfo { url, token: None }, None))
 }
 
 /// Release: mitgeliefertes Engine-Binary auf freiem Port mit zufälligem Token starten.
 #[cfg(not(debug_assertions))]
-fn start_engine(app: &tauri::AppHandle) -> Result<(EngineInfo, Option<CommandChild>), String> {
-    use tauri_plugin_shell::ShellExt;
+fn start_engine(
+    app: &tauri::AppHandle,
+    log: std::sync::Arc<Mutex<Vec<String>>>,
+) -> Result<(EngineInfo, Option<CommandChild>), String> {
+    use tauri_plugin_shell::{process::CommandEvent, ShellExt};
 
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .and_then(|l| l.local_addr())
@@ -48,7 +61,7 @@ fn start_engine(app: &tauri::AppHandle) -> Result<(EngineInfo, Option<CommandChi
     let token = format!("{}{}", uuid::Uuid::new_v4().simple(), uuid::Uuid::new_v4().simple());
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
 
-    let (_events, child) = app
+    let (mut events, child) = app
         .shell()
         .sidecar("kac-engine")
         .map_err(|e| e.to_string())?
@@ -65,6 +78,28 @@ fn start_engine(app: &tauri::AppHandle) -> Result<(EngineInfo, Option<CommandChi
         .spawn()
         .map_err(|e| e.to_string())?;
 
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = events.recv().await {
+            let line = match event {
+                CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
+                    String::from_utf8_lossy(&b).trim_end().to_string()
+                }
+                CommandEvent::Error(e) => format!("Fehler: {e}"),
+                CommandEvent::Terminated(p) => {
+                    format!("Engine beendet (Code {:?}, Signal {:?})", p.code, p.signal)
+                }
+                _ => continue,
+            };
+            if let Ok(mut l) = log.lock() {
+                l.push(line);
+                let len = l.len();
+                if len > 200 {
+                    l.drain(..len - 200);
+                }
+            }
+        }
+    });
+
     Ok((
         EngineInfo {
             url: format!("http://127.0.0.1:{port}"),
@@ -74,17 +109,32 @@ fn start_engine(app: &tauri::AppHandle) -> Result<(EngineInfo, Option<CommandChi
     ))
 }
 
+/// Auf kleinen Bildschirmen (z. B. uConsole mit 1280×720) maximiert starten,
+/// statt ein 1440×900-Fenster über den Rand ragen zu lassen.
+fn fit_small_screens(app: &tauri::App) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    if let Ok(Some(monitor)) = window.current_monitor() {
+        let size = monitor.size().to_logical::<f64>(monitor.scale_factor());
+        if size.width < 1500.0 || size.height < 960.0 {
+            let _ = window.maximize();
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(Engine::default())
-        .invoke_handler(tauri::generate_handler![engine_info])
+        .invoke_handler(tauri::generate_handler![engine_info, engine_log])
         .setup(|app| {
-            let (info, child) = start_engine(app.handle())?;
             let engine = app.state::<Engine>();
+            let (info, child) = start_engine(app.handle(), engine.log.clone())?;
             *engine.info.lock().unwrap() = Some(info);
             *engine.child.lock().unwrap() = child;
+            fit_small_screens(app);
             Ok(())
         })
         .build(tauri::generate_context!())

@@ -27,7 +27,17 @@ export function engineInfo(): Promise<EngineInfo> {
           token: import.meta.env.VITE_ENGINE_TOKEN ?? null,
         };
       }
-      await waitForHealth(info.url);
+      try {
+        await waitForHealth(info.url);
+      } catch (e) {
+        if (isTauri) {
+          // Ausgabe des Sidecars anzeigen, damit Startfehler erkennbar sind
+          const { invoke } = await import("@tauri-apps/api/core");
+          const log = await invoke<string[]>("engine_log").catch(() => []);
+          if (log.length) throw new Error(`${(e as Error).message}. Letzte Ausgabe: ${log.slice(-6).join(" | ")}`);
+        }
+        throw e;
+      }
       return info;
     })();
     // Fehlgeschlagene Verbindung beim nächsten Aufruf erneut versuchen

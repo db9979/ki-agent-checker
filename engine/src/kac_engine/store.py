@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS providers (
     model TEXT NOT NULL,
     base_url TEXT,
     has_api_key INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    verify_tls INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY,
@@ -68,7 +69,16 @@ class Store:
         self._db = sqlite3.connect(str(path), check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(SCHEMA)
+        self._migrate()
         self._db.commit()
+
+    def _migrate(self) -> None:
+        """Ergänzt Spalten, die in älteren Datenbanken fehlen."""
+        columns = {r["name"] for r in self._db.execute("PRAGMA table_info(providers)")}
+        if "verify_tls" not in columns:
+            self._db.execute(
+                "ALTER TABLE providers ADD COLUMN verify_tls INTEGER NOT NULL DEFAULT 1"
+            )
 
     # Audit-Log -----------------------------------------------------------
     def audit(self, action: str, detail: dict) -> None:
@@ -95,11 +105,14 @@ class Store:
             base_url=str(data.base_url).rstrip("/") if data.base_url else None,
             has_api_key=has_api_key,
             self_hosted=data.kind in SELF_HOSTED_KINDS,
+            verify_tls=data.verify_tls,
             created_at=_now(),
         )
         with self._lock:
             self._db.execute(
-                "INSERT INTO providers VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO providers"
+                " (id, name, kind, model, base_url, has_api_key, created_at, verify_tls)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     provider.id,
                     provider.name,
@@ -108,6 +121,7 @@ class Store:
                     provider.base_url,
                     int(has_api_key),
                     provider.created_at.isoformat(),
+                    int(provider.verify_tls),
                 ),
             )
             self._db.commit()
@@ -124,6 +138,7 @@ class Store:
             base_url=row["base_url"],
             has_api_key=bool(row["has_api_key"]),
             self_hosted=kind in SELF_HOSTED_KINDS,
+            verify_tls=bool(row["verify_tls"]),
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 

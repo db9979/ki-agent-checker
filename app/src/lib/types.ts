@@ -16,6 +16,7 @@ export interface Provider {
   base_url: string | null;
   has_api_key: boolean;
   self_hosted: boolean;
+  verify_tls: boolean;
   created_at: string;
 }
 

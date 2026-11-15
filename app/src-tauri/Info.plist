@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- macOS fragt damit beim ersten Zugriff auf Modelle im Heimnetz (z. B. 192.168.x.x) um Erlaubnis.
+       Ohne diesen Eintrag blockiert macOS 15 den Zugriff stillschweigend. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>KI-Agent-Checker verbindet sich mit KI-Modellen und Agenten in deinem lokalen Netzwerk.</string>
+</dict>
+</plist>

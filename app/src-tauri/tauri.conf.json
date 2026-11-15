@@ -15,8 +15,8 @@
         "title": "KI-Agent-Checker",
         "width": 1440,
         "height": 900,
-        "minWidth": 1100,
-        "minHeight": 700,
+        "minWidth": 960,
+        "minHeight": 600,
         "backgroundColor": "#070b14"
       }
     ],
@@ -29,6 +29,11 @@
     "targets": "all",
     "category": "DeveloperTool",
     "shortDescription": "Sicherheitstests für KI-Agenten",
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "11.0"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
