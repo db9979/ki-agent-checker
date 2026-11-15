@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, mcp, providers, report, skills
+from . import __version__, mcp, providers, report, scanners, skills
 from . import attacks as attack_lib
 from .demo import run_demo
 from .events import EventHub
@@ -61,8 +61,17 @@ class DiscoverIn(BaseModel):
     verify_tls: bool = True
 
 
+class ScannerIn(BaseModel):
+    tool: Literal["garak", "promptfoo"]
+    cmd: str = ""
+    probes: str = ""
+    purpose: str = ""
+    num_tests: int = Field(default=3, ge=1, le=20)
+
+
 class RunIn(BaseModel):
     target_id: str
+    scanner: ScannerIn | None = None
     modules: list[str] | None = None
     judge_provider_id: str | None = None
     mfa_codes: dict[str, str] = Field(
@@ -348,7 +357,7 @@ def create_app(
         return {"run_id": run_id}
 
     @app.post("/runs", dependencies=protected, status_code=202)
-    async def start_run(data: RunIn) -> dict:
+    async def start_run(data: RunIn, request: Request) -> dict:
         target = store.get_target(data.target_id)
         if not target:
             raise HTTPException(404, "Ziel nicht gefunden")
@@ -357,6 +366,8 @@ def create_app(
             raise HTTPException(422, "Projekt des Ziels fehlt")
         if target.url and not in_scope(target.url, project.scope):
             raise HTTPException(403, "Das Ziel liegt nicht im Scope des Projekts")
+        if data.scanner:
+            return _start_scanner(data, target, project.id, str(request.base_url).rstrip("/"))
         known = mcp.MCP_KEYS if target.kind == TargetKind.MCP else attack_lib.all_keys()
         modules = data.modules or (
             known if target.kind == TargetKind.MCP else attack_lib.MODULE_KEYS
@@ -413,6 +424,81 @@ def create_app(
         task.cancel()
         store.audit("run.cancelled", {"id": run_id})
         return {"ok": True}
+
+    # Externe Scanner -------------------------------------------------------
+    bridge = scanners.Bridge()
+
+    def _start_scanner(data: RunIn, target, project_id: str, base_url: str) -> dict:
+        assert data.scanner
+        if target.kind == TargetKind.MCP:
+            raise HTTPException(
+                422,
+                "garak und Promptfoo testen Chat-Ziele. Für ein Tool den Typ „Ein Tool als Agent angreifen“ wählen",
+            )
+        provider = store.get_provider(target.provider_id) if target.provider_id else None
+        if target.kind == TargetKind.MODEL and not provider:
+            raise HTTPException(422, "Für dieses Ziel ist kein Modell ausgewählt")
+        convo = Conversations(
+            RunConfig(target=target, modules=[], provider=provider, mfa_codes=data.mfa_codes), keys
+        )
+        idx = 0 if target.accounts else -1
+
+        async def reply(message: str) -> str:
+            text, _ = await convo.reply(idx, [{"role": "user", "content": message}])
+            return text
+
+        run_id = uuid.uuid4().hex[:12]
+        store.audit(
+            "run.started",
+            {"id": run_id, "kind": data.scanner.tool, "target": target.id, "project": project_id},
+        )
+
+        async def go() -> None:
+            try:
+                await scanners.run_scanner(
+                    hub,
+                    store,
+                    bridge,
+                    reply,
+                    scanners.ScannerConfig(**data.scanner.model_dump()),
+                    engine_url=base_url,
+                    label=target.describe(),
+                    target_id=target.id,
+                    project_id=project_id,
+                    run_id=run_id,
+                )
+            finally:
+                await convo.close()
+
+        _track(run_id, asyncio.create_task(go()))
+        return {"run_id": run_id}
+
+    @app.post("/bridge/{key}")
+    async def bridge_chat(key: str, request: Request) -> dict:
+        """Brücke für externe Scanner, nur während ihres Laufs gültig (geheimer Schlüssel im Pfad)."""
+        reply = bridge.routes.get(key)
+        if not reply:
+            raise HTTPException(404, "Unbekannte Brücke")
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(422, "JSON erwartet") from exc
+        message = (
+            str(body.get("message") or body.get("prompt") or "") if isinstance(body, dict) else ""
+        )
+        try:
+            return {"reply": await reply(message)}
+        except Exception as exc:  # noqa: BLE001
+            # 5xx ließe garak endlos wiederholen; Fehler zählen und leer antworten
+            bridge.failed(key, providers.describe_error(exc))
+            return {"reply": ""}
+
+    @app.get("/scanners/check", dependencies=protected)
+    async def check_scanner(tool: str, cmd: str = "") -> dict:
+        try:
+            return await scanners.check(tool, cmd)
+        except scanners.ScannerError as exc:
+            raise HTTPException(422, str(exc)) from exc
 
     # Berichte --------------------------------------------------------------
     report_key = pysecrets.token_bytes(32)
