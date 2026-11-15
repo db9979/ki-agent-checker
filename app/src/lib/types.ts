@@ -1,12 +1,6 @@
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
-export type ProviderKind =
-  | "ollama"
-  | "openai_compatible"
-  | "openai"
-  | "anthropic"
-  | "gemini"
-  | "mistral";
+export type ProviderKind = "ollama" | "openai_compatible" | "openai" | "anthropic" | "gemini" | "mistral";
 
 export interface Provider {
   id: string;
@@ -66,7 +60,7 @@ export interface EngineEvent {
   [key: string]: unknown;
 }
 
-export type TargetKind = "model" | "openai_endpoint" | "http";
+export type TargetKind = "model" | "openai_endpoint" | "http" | "mcp";
 export type AuthKind = "none" | "bearer" | "header" | "basic" | "login";
 
 export interface AuthConfig {
@@ -110,6 +104,7 @@ export interface Target {
   response_path: string;
   verify_tls: boolean;
   auth: AuthConfig;
+  mcp_tool_calls?: "none" | "readonly" | "all";
   accounts: Account[];
   leak_markers: string[];
   delay: number;
@@ -124,4 +119,6 @@ export interface AttackModuleInfo {
   attacks: number;
   needs_accounts: number;
   title: string;
+  target: "agent" | "mcp";
+  calls_tools?: boolean;
 }

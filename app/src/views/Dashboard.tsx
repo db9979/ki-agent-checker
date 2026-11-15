@@ -25,14 +25,19 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
     if (live) {
       return run.modules.map((m) => ({ ...m, rate: m.attempts ? m.hits / m.attempts : null }));
     }
-    return MODULES.map((m) => {
+    const mcpRun =
+      !!last && (last.target.startsWith("MCP-Server") || last.findings.some((f) => f.module.startsWith("mcp_")));
+    return MODULES.filter((m) => m.key.startsWith("mcp_") === mcpRun).map((m) => {
       const f = last?.findings.find((x) => x.module === m.key);
       return { ...m, attempts: last ? 1 : 0, rate: last ? (f?.success_rate ?? 0) : null };
     });
   }, [live, run.modules, last]);
 
   const trend = finished.map((r, i) => ({ label: `#${i + 1}`, score: r.score ?? 0 }));
-  const radar = rows.map((r) => ({ module: r.label, resistance: r.rate === null ? 100 : Math.round((1 - r.rate) * 100) }));
+  const radar = rows.map((r) => ({
+    module: r.label,
+    resistance: r.rate === null ? 100 : Math.round((1 - r.rate) * 100),
+  }));
 
   return (
     <div className="grid grid-cols-12 gap-4">
@@ -61,7 +66,10 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-[#0b1222]">
-              <motion.div className="h-full bg-cyan" animate={{ width: `${(run.done / Math.max(1, run.total)) * 100}%` }} />
+              <motion.div
+                className="h-full bg-cyan"
+                animate={{ width: `${(run.done / Math.max(1, run.total)) * 100}%` }}
+              />
             </div>
           </div>
         )}
@@ -108,14 +116,24 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <ShieldAlert size={16} style={{ color: SEVERITY_COLOR[f.severity] }} />
                   <span className="font-medium">{f.title}</span>
-                  <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${SEVERITY_COLOR[f.severity]}22`, color: SEVERITY_COLOR[f.severity] }}>
+                  <span
+                    className="rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                    style={{ background: `${SEVERITY_COLOR[f.severity]}22`, color: SEVERITY_COLOR[f.severity] }}
+                  >
                     {SEVERITY_LABEL[f.severity]}
                   </span>
-                  <span className="rounded-md bg-violet/15 px-2 py-0.5 text-[11px] text-violet" title={OWASP_LABEL[f.owasp]}>
+                  <span
+                    className="rounded-md bg-violet/15 px-2 py-0.5 text-[11px] text-violet"
+                    title={OWASP_LABEL[f.owasp]}
+                  >
                     {f.owasp}
                   </span>
-                  {f.atlas && <span className="rounded-md bg-cyan/10 px-2 py-0.5 text-[11px] text-cyan">{f.atlas}</span>}
-                  <span className="ml-auto text-xs tabular-nums text-muted">{Math.round(f.success_rate * 100)} % erfolgreich</span>
+                  {f.atlas && (
+                    <span className="rounded-md bg-cyan/10 px-2 py-0.5 text-[11px] text-cyan">{f.atlas}</span>
+                  )}
+                  <span className="ml-auto text-xs tabular-nums text-muted">
+                    {Math.round(f.success_rate * 100)} % erfolgreich
+                  </span>
                 </div>
                 <p className="mt-2 text-sm text-text/80">
                   <span className="font-medium text-green">Gegenmaßnahme: </span>

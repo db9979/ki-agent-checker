@@ -38,7 +38,14 @@ export function ScoreGauge({ score, label = "Security-Score" }: { score: number 
           </filter>
         </defs>
         <path d="M20 110 A90 90 0 0 1 200 110" fill="none" stroke="#1e2a44" strokeWidth="14" strokeLinecap="round" />
-        <path d="M20 110 A90 90 0 0 1 200 110" fill="none" stroke="url(#gauge-track)" strokeOpacity="0.18" strokeWidth="14" strokeLinecap="round" />
+        <path
+          d="M20 110 A90 90 0 0 1 200 110"
+          fill="none"
+          stroke="url(#gauge-track)"
+          strokeOpacity="0.18"
+          strokeWidth="14"
+          strokeLinecap="round"
+        />
         <motion.path
           d="M20 110 A90 90 0 0 1 200 110"
           fill="none"
@@ -50,7 +57,15 @@ export function ScoreGauge({ score, label = "Security-Score" }: { score: number 
         />
         {score !== null && (
           <>
-            <motion.line x1="110" y1="110" x2={needleX} y2={needleY} stroke="#e6ecff" strokeWidth="2.5" strokeLinecap="round" />
+            <motion.line
+              x1="110"
+              y1="110"
+              x2={needleX}
+              y2={needleY}
+              stroke="#e6ecff"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
             <circle cx="110" cy="110" r="6" fill="#e6ecff" />
           </>
         )}

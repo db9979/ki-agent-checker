@@ -9,6 +9,8 @@ Drei Arten von Zielen:
   Chat-Schnittstelle anbietet (viele Agent-Frameworks können das).
 * ``http``: ein beliebiger HTTP-Endpunkt mit JSON, z. B. das Backend eines
   Chat-Widgets. Anfrage und Antwortfeld werden per Vorlage beschrieben.
+* ``mcp``: ein MCP-Server (Streamable HTTP), der einem Agenten Tools bereitstellt.
+  Er wird mit eigenen Prüfungen auditiert (siehe ``mcp.py``).
 
 Für Ziele hinter einer Anmeldung gibt es API-Schlüssel, eigene Header,
 Basic Auth und einen Login-Aufruf (mit TOTP für 2FA). Pro Ziel lassen sich
@@ -40,6 +42,7 @@ class TargetKind(StrEnum):
     MODEL = "model"
     OPENAI_ENDPOINT = "openai_endpoint"
     HTTP = "http"
+    MCP = "mcp"
 
 
 class AuthKind(StrEnum):
@@ -126,6 +129,10 @@ class TargetIn(BaseModel):
         description="Texte aus dem System-Prompt, die nie in einer Antwort auftauchen dürfen",
     )
     delay: float = Field(default=0.5, ge=0, le=30, description="Pause zwischen Anfragen")
+    mcp_tool_calls: Literal["none", "readonly", "all"] = Field(
+        default="readonly",
+        description="Welche Tools eines MCP-Servers beim Audit aufgerufen werden dürfen",
+    )
 
 
 class Target(BaseModel):
@@ -146,6 +153,7 @@ class Target(BaseModel):
     accounts: list[Account] = Field(default_factory=list)
     leak_markers: list[str] = Field(default_factory=list)
     delay: float = 0.5
+    mcp_tool_calls: Literal["none", "readonly", "all"] = "readonly"
     created_at: datetime
 
     def describe(self) -> str:

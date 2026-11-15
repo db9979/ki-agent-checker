@@ -7,6 +7,7 @@ import {
   Loader2,
   Plug,
   Plus,
+  Server,
   ShieldCheck,
   Trash2,
   X,
@@ -20,7 +21,7 @@ import { useApi } from "../lib/useApi";
 
 const input = "w-full rounded-lg border border-line bg-[#0b1222] px-3 py-2 text-sm outline-none focus:border-cyan";
 
-const KIND_ICON = { model: Bot, openai_endpoint: Plug, http: Globe } as const;
+const KIND_ICON = { model: Bot, openai_endpoint: Plug, http: Globe, mcp: Server } as const;
 
 function CodeInputs({
   names,
@@ -54,7 +55,10 @@ function CodeInputs({
 }
 
 function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: () => void; onClose: () => void }) {
-  const { data: modules } = useApi<AttackModuleInfo[]>("/attack-modules");
+  const { data: allModules } = useApi<AttackModuleInfo[]>("/attack-modules");
+  const isMcp = target.kind === "mcp";
+  const modules = allModules?.filter((m) => m.target === (isMcp ? "mcp" : "agent"));
+  const noCalls = isMcp && target.mcp_tool_calls === "none";
   const { data: providers } = useApi<Provider[]>("/providers");
   const [off, setOff] = useState<Set<string>>(new Set());
   const [judge, setJudge] = useState("");
@@ -93,12 +97,18 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
       </div>
       <div className="grid grid-cols-2 gap-1">
         {(modules ?? []).map((m) => {
-          const unavailable = m.needs_accounts > pairs;
+          const unavailable = m.needs_accounts > pairs || (noCalls && !!m.calls_tools);
           return (
             <label
               key={m.key}
               className={`flex items-center gap-2 text-xs ${unavailable ? "opacity-40" : ""}`}
-              title={unavailable ? "Braucht zwei Testkonten mit Kennung und privater Angabe" : m.title}
+              title={
+                unavailable
+                  ? isMcp
+                    ? "Ruft Tools auf, beim Ziel sind Tool-Aufrufe ausgeschaltet"
+                    : "Braucht zwei Testkonten mit Kennung und privater Angabe"
+                  : m.title
+              }
             >
               <input
                 type="checkbox"
@@ -111,26 +121,28 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
                   setOff(next);
                 }}
               />
-              {m.label} <span className="text-[10px] text-muted">({m.attacks})</span>
+              {m.label} {m.attacks > 0 && <span className="text-[10px] text-muted">({m.attacks})</span>}
             </label>
           );
         })}
       </div>
-      <label className="block text-xs text-muted">
-        Richter-Modell (bewertet unklare Antworten, optional)
-        <select
-          className="mt-1 w-full rounded-md border border-line bg-[#0b1222] px-2 py-1.5 text-xs"
-          value={judge}
-          onChange={(e) => setJudge(e.target.value)}
-        >
-          <option value="">ohne Richter (nur eindeutige Signale)</option>
-          {(providers ?? []).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!isMcp && (
+        <label className="block text-xs text-muted">
+          Richter-Modell (bewertet unklare Antworten, optional)
+          <select
+            className="mt-1 w-full rounded-md border border-line bg-[#0b1222] px-2 py-1.5 text-xs"
+            value={judge}
+            onChange={(e) => setJudge(e.target.value)}
+          >
+            <option value="">ohne Richter (nur eindeutige Signale)</option>
+            {(providers ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {manual && <CodeInputs names={names} codes={codes} onChange={setCodes} />}
       {error && <p className="text-xs text-red">{error}</p>}
       <button

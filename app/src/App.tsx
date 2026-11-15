@@ -62,10 +62,18 @@ export default function App() {
         </div>
         <button
           onClick={() => setEffectsMode(effects === "voll" ? "sparsam" : "voll")}
-          title={effects === "voll" ? "Effekte: voll (klicken für Leistungsmodus)" : "Leistungsmodus aktiv (klicken für volle Effekte)"}
+          title={
+            effects === "voll"
+              ? "Effekte: voll (klicken für Leistungsmodus)"
+              : "Leistungsmodus aktiv (klicken für volle Effekte)"
+          }
           className="mb-3 mt-auto flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-muted transition hover:bg-panel-2 hover:text-text min-[1400px]:justify-start"
         >
-          {effects === "voll" ? <Sparkles size={15} className="shrink-0 text-violet" /> : <Gauge size={15} className="shrink-0 text-amber" />}
+          {effects === "voll" ? (
+            <Sparkles size={15} className="shrink-0 text-violet" />
+          ) : (
+            <Gauge size={15} className="shrink-0 text-amber" />
+          )}
           <span className="hidden min-[1400px]:inline">{effects === "voll" ? "Effekte: voll" : "Leistungsmodus"}</span>
         </button>
         <div
