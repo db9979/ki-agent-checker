@@ -144,7 +144,12 @@ def resolve(args: list[str]) -> list[str]:
 
 
 def split_cmd(cmd: str, tool: str) -> list[str]:
-    parts = shlex.split(cmd or DEFAULT_CMD[tool], posix=os.name != "nt")
+    posix = os.name != "nt"
+    parts = shlex.split(cmd or DEFAULT_CMD[tool], posix=posix)
+    if not posix:
+        # Windows: shlex lässt die Anführungszeichen stehen, Pfade mit Leerzeichen
+        # kommen aber in Anführungszeichen ("C:\Program Files\...").
+        parts = [p[1:-1] if len(p) > 1 and p[0] == p[-1] == '"' else p for p in parts]
     if not parts:
         raise ScannerError("Kein Befehl angegeben")
     return parts

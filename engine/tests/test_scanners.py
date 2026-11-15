@@ -145,3 +145,14 @@ def test_parsers_handle_old_and_new_formats():
     hit = scanners.garak_attempt(old)
     assert hit and hit.success and hit.owasp == "LLM05" and hit.prompt == "plain"
     assert scanners.garak_attempt({**old, "status": 1}) is None
+
+
+def test_split_cmd_windows_quotes(monkeypatch):
+    from kac_engine import scanners
+
+    monkeypatch.setattr(scanners.os, "name", "nt")
+    assert scanners.split_cmd(r'"C:\Program Files\py.exe" "D:\a b\x.py" -v', "garak") == [
+        r"C:\Program Files\py.exe",
+        r"D:\a b\x.py",
+        "-v",
+    ]
