@@ -39,6 +39,7 @@ export interface RunState {
   score: number | null;
   findings: Finding[];
   online: boolean;
+  error: string | null;
 }
 
 const initial: RunState = {
@@ -52,6 +53,7 @@ const initial: RunState = {
   score: null,
   findings: [],
   online: false,
+  error: null,
 };
 
 let state: RunState = initial;
@@ -117,6 +119,8 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
           m.key === e.module ? { ...m, attempts: m.attempts + 1, hits: m.hits + (e.success ? 1 : 0) } : m,
         ),
       };
+    case "run.error":
+      return { ...s, error: e.error as string };
     case "run.finished":
       return { ...s, status: "finished", score: e.score as number, findings: e.findings as Finding[] };
     default:

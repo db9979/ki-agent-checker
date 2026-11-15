@@ -5,6 +5,7 @@ export const MODULES = [
   { key: "system_prompt_leak", label: "System-Prompt-Leak", owasp: "LLM07" },
   { key: "data_exfiltration", label: "Datenabfluss", owasp: "LLM02" },
   { key: "excessive_agency", label: "Tool-Missbrauch", owasp: "LLM06" },
+  { key: "cross_account", label: "Fremde Kontodaten", owasp: "LLM02" },
 ] as const;
 
 export function moduleLabel(key: string): string {

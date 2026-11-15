@@ -81,7 +81,7 @@ export default function App() {
         {view === "live" && <LiveAttack onStartDemo={startDemo} />}
         {view === "graph" && <AttackGraph />}
         {view === "models" && <Models />}
-        {view === "projects" && <Projects />}
+        {view === "projects" && <Projects onRunStarted={() => setView("live")} />}
       </main>
     </div>
   );

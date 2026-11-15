@@ -19,6 +19,7 @@ from .models import (
     ProviderKind,
     RunSummary,
 )
+from .targets import Target
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS providers (
@@ -49,6 +50,12 @@ CREATE TABLE IF NOT EXISTS runs (
     status TEXT NOT NULL,
     score INTEGER,
     findings TEXT NOT NULL DEFAULT '[]'
+);
+CREATE TABLE IF NOT EXISTS targets (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    config TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,6 +191,9 @@ class Store:
             self._db.commit()
         return project
 
+    def get_project(self, project_id: str) -> Project | None:
+        return next((p for p in self.list_projects() if p.id == project_id), None)
+
     def list_projects(self) -> list[Project]:
         rows = self._db.execute("SELECT * FROM projects ORDER BY created_at").fetchall()
         return [
@@ -237,3 +247,46 @@ class Store:
             )
             for r in rows
         ]
+
+    # Ziele -----------------------------------------------------------------
+    def save_target(self, target: Target) -> None:
+        config = target.model_dump(mode="json", exclude={"id", "project_id", "created_at"})
+        with self._lock:
+            self._db.execute(
+                "INSERT OR REPLACE INTO targets VALUES (?, ?, ?, ?)",
+                (
+                    target.id,
+                    target.project_id,
+                    json.dumps(config, ensure_ascii=False),
+                    target.created_at.isoformat(),
+                ),
+            )
+            self._db.commit()
+
+    @staticmethod
+    def _target(row: sqlite3.Row) -> Target:
+        return Target(
+            id=row["id"],
+            project_id=row["project_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            **json.loads(row["config"]),
+        )
+
+    def list_targets(self, project_id: str | None = None) -> list[Target]:
+        if project_id:
+            rows = self._db.execute(
+                "SELECT * FROM targets WHERE project_id = ? ORDER BY created_at", (project_id,)
+            ).fetchall()
+        else:
+            rows = self._db.execute("SELECT * FROM targets ORDER BY created_at").fetchall()
+        return [self._target(r) for r in rows]
+
+    def get_target(self, target_id: str) -> Target | None:
+        row = self._db.execute("SELECT * FROM targets WHERE id = ?", (target_id,)).fetchone()
+        return self._target(row) if row else None
+
+    def delete_target(self, target_id: str) -> bool:
+        with self._lock:
+            cur = self._db.execute("DELETE FROM targets WHERE id = ?", (target_id,))
+            self._db.commit()
+        return cur.rowcount > 0
