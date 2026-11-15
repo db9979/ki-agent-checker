@@ -2,6 +2,7 @@ import {
   Activity,
   BookOpen,
   FolderKanban,
+  GitCompareArrows,
   Gauge,
   LayoutDashboard,
   Network,
@@ -14,6 +15,7 @@ import { api, subscribe } from "./lib/engine";
 import { dispatch, setOnline, useRun } from "./lib/runStore";
 import { setEffectsMode, useEffectsMode } from "./lib/settings";
 import { AttackGraph } from "./views/AttackGraph";
+import { Compare } from "./views/Compare";
 import { Dashboard } from "./views/Dashboard";
 import { LiveAttack } from "./views/LiveAttack";
 import { Models } from "./views/Models";
@@ -24,6 +26,7 @@ const NAV = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "live", label: "Live-Angriff", icon: Activity },
   { id: "graph", label: "Angriffsgraph", icon: Network },
+  { id: "compare", label: "Vergleich", icon: GitCompareArrows },
   { id: "models", label: "Modelle", icon: Server },
   { id: "projects", label: "Projekte", icon: FolderKanban },
   { id: "skills", label: "Skills", icon: BookOpen },
@@ -100,6 +103,7 @@ export default function App() {
         {view === "dashboard" && <Dashboard onStartDemo={startDemo} />}
         {view === "live" && <LiveAttack onStartDemo={startDemo} />}
         {view === "graph" && <AttackGraph />}
+        {view === "compare" && <Compare />}
         {view === "models" && <Models />}
         {view === "projects" && <Projects onRunStarted={() => setView("live")} />}
         {view === "skills" && <Skills />}

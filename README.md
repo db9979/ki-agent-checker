@@ -87,6 +87,12 @@ Im Dashboard erzeugt **Bericht** für den letzten Lauf (oder unter „Letzte Lä
 
 ![Bericht](docs/screenshots/bericht.png)
 
+### Läufe vergleichen
+
+Unter **Vergleich** stehen zwei Läufe desselben Ziels nebeneinander: Score vorher und nachher, was behoben ist, was neu kaputt ist und was schlechter wurde, jeweils mit der Erfolgsquote der Angriffe. Im Score-Verlauf wählt ein Klick auf einen Punkt den Lauf aus.
+
+![Vergleich](docs/screenshots/vergleich.png)
+
 ### garak und Promptfoo
 
 Im Testlauf lassen sich statt der eigenen Angriffe auch [garak](https://github.com/NVIDIA/garak) oder [Promptfoo](https://www.promptfoo.dev/) wählen. Beide werden separat installiert (`pipx install garak`, auf dem Mac vorher `brew install pipx`; Promptfoo per `npx -y promptfoo@latest` mit Node.js 18+). Die App stellt für die Dauer des Laufs eine lokale Brücke bereit, über die der Scanner mit dem Ziel spricht. Anmeldung, 2FA, eigene Modelle und MCP-Tools funktionieren damit genauso wie bei den eigenen Angriffen. garak-Ergebnisse erscheinen live im Angriffspfad, Promptfoo-Ergebnisse nach dem Lauf. Befunde werden nach OWASP LLM Top 10 eingeordnet.
