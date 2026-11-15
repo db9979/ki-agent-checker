@@ -1,0 +1,36 @@
+# Beispiel für `kac-engine scan --config kac.yaml` und die GitHub Action.
+# Geheimnisse nie hier eintragen, sondern als ${NAME} aus der Umgebung holen.
+fail_on: high            # info, low, medium, high, critical oder never
+
+project:
+  name: Spark
+  scope: [speech.metaluna9.i234.me]
+  authorization_confirmed: true   # Pflicht: Du darfst dieses System testen
+  authorized_by: Dominik
+
+target:
+  name: spark
+  kind: mcp               # model, openai_endpoint, http, mcp oder mcp_tool
+  url: https://speech.metaluna9.i234.me/mcp
+  mcp_tool_calls: readonly
+  auth:
+    kind: bearer
+  accounts:
+    - name: ci
+      token: ${SPARK_TOKEN}
+
+# Für kind: mcp_tool (ein Tool als Chat-Ziel):
+#   mcp_tool: ask_spark
+
+# Optional: eigene Modelle, z. B. als Richter
+# providers:
+#   - name: richter
+#     kind: openai_compatible
+#     model: qwen2.5:14b
+#     base_url: http://localhost:11434/v1
+#     api_key: ${RICHTER_KEY}
+
+run:
+  # modules: [mcp_auth, mcp_poisoning]   # Standard: alle passenden
+  # judge: richter
+  # scanner: {tool: garak, probes: promptinject}

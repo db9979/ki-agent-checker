@@ -1,0 +1,58 @@
+name: KI-Agent-Checker
+description: Testet einen KI-Agenten, ein Modell oder einen MCP-Server auf Schwachstellen und schlägt bei Befunden fehl.
+inputs:
+  config:
+    description: Pfad zur YAML-Konfiguration (project, target, run)
+    required: true
+  fail-on:
+    description: Ab dieser Schwere schlägt der Job fehl (info, low, medium, high, critical, never)
+    default: high
+  scanner:
+    description: Optional garak oder promptfoo statt der eigenen Angriffe
+    default: ""
+  report:
+    description: Dateiname des HTML-Berichts
+    default: ki-agent-checker-bericht.html
+outputs:
+  score:
+    description: Sicherheits-Score von 0 bis 100
+    value: ${{ steps.scan.outputs.score }}
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v6
+    - name: Engine installieren
+      shell: bash
+      run: uv tool install --python 3.12 "${{ github.action_path }}/engine"
+    - name: garak installieren
+      if: inputs.scanner == 'garak'
+      shell: bash
+      run: uv tool install --python 3.12 garak
+    - name: Prüfen
+      id: scan
+      shell: bash
+      env:
+        KAC_CONFIG: ${{ inputs.config }}
+        KAC_FAIL_ON: ${{ inputs.fail-on }}
+        KAC_SCANNER: ${{ inputs.scanner }}
+        KAC_REPORT: ${{ inputs.report }}
+      run: |
+        set +e
+        args=(scan --config "$KAC_CONFIG" --fail-on "$KAC_FAIL_ON" --report "$KAC_REPORT" \
+              --json ki-agent-checker.json --junit ki-agent-checker.xml)
+        [ -n "$KAC_SCANNER" ] && args+=(--scanner "$KAC_SCANNER")
+        kac-engine "${args[@]}" | tee ki-agent-checker.txt
+        code=${PIPESTATUS[0]}
+        { echo "### KI-Agent-Checker"; echo '```'; cat ki-agent-checker.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        [ -f ki-agent-checker.json ] && echo "score=$(jq -r '.score // ""' ki-agent-checker.json)" >> "$GITHUB_OUTPUT"
+        exit $code
+    - name: Bericht hochladen
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ki-agent-checker
+        path: |
+          ${{ inputs.report }}
+          ki-agent-checker.json
+          ki-agent-checker.xml
+        if-no-files-found: ignore

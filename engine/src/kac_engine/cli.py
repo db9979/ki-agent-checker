@@ -1,4 +1,4 @@
-"""Kommandozeile: ``kac-engine serve`` startet die lokale API.
+"""Kommandozeile: ``kac-engine serve`` startet die lokale API, ``kac-engine scan`` prüft ohne Oberfläche.
 
 Die Desktop-App startet die Engine als Sidecar mit zufälligem Token und Port.
 """
@@ -14,6 +14,7 @@ from pathlib import Path
 
 import uvicorn
 
+from . import scan
 from .api import create_app
 
 
@@ -50,7 +51,10 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Beenden, sobald stdin schließt (die Desktop-App wurde beendet oder ist abgestürzt)",
     )
+    scan.add_parser(sub)
     args = parser.parse_args(argv)
+    if args.command == "scan":
+        sys.exit(scan.run_scan(args))
 
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         parser.error("Die Engine lauscht aus Sicherheitsgründen nur auf localhost")
