@@ -39,7 +39,7 @@ function Counter({ value, label, color }: { value: number; label: string; color:
     <div className="text-right">
       <motion.div
         key={value}
-        initial={{ scale: 1.6, opacity: 0.4 }}
+        initial={{ scale: 1.3, opacity: 0.4 }}
         animate={{ scale: 1, opacity: 1 }}
         className="font-mono text-2xl font-semibold tabular-nums leading-none"
         style={{ color, textShadow: `0 0 12px ${color}` }}
@@ -51,7 +51,7 @@ function Counter({ value, label, color }: { value: number; label: string; color:
   );
 }
 
-/** 3D-Arena mit futuristischer HUD-Ebene darüber. */
+/** 3D-Arena mit klaren Zonen: Statusleiste oben, freie Szene, Payload und Module unten. */
 export function ArenaStage({ run, mode }: { run: RunState; mode: EffectsMode }) {
   const full = mode === "voll";
   const current = run.attacks.at(-1);
@@ -61,129 +61,141 @@ export function ArenaStage({ run, mode }: { run: RunState; mode: EffectsMode }) 
   const score = liveScore(run);
   const payload = current?.messages.find((m) => m.role === "attacker")?.text ?? "";
 
-  // Stempel und Alarm nur für frisch beendete Angriffe
+  // Urteil und Alarm nur für frisch beendete Angriffe
   const [stamp, setStamp] = useState<{ id: string; hit: boolean } | null>(null);
   const seen = useRef<string | null>(null);
   useEffect(() => {
     if (!lastFinished || seen.current === lastFinished.id) return;
     seen.current = lastFinished.id;
     setStamp({ id: lastFinished.id, hit: !!lastFinished.success });
-    const t = setTimeout(() => setStamp(null), 1600);
+    const t = setTimeout(() => setStamp(null), 2200);
     return () => clearTimeout(t);
   }, [lastFinished]);
 
   const progress = run.total ? run.done / run.total : 0;
+  const status = run.status === "running" ? "Angriff läuft" : run.status === "finished" ? "Lauf beendet" : "Bereit";
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-[14px] bg-[radial-gradient(circle_at_50%_55%,#0f1a3a,#060912_70%)]">
-      <WebGLGuard>
-        <Suspense
-          fallback={<div className="flex h-full items-center justify-center text-xs text-muted">Arena lädt …</div>}
-        >
-          <Arena attacks={run.attacks} runId={run.runId} quality={mode} />
-        </Suspense>
-      </WebGLGuard>
-
-      {/* HUD */}
-      <div className="hud-scanlines absolute inset-0" />
-      <Corners />
-
-      <div className="pointer-events-none absolute left-6 top-5 max-w-[55%]">
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-cyan">
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${run.status === "running" ? "animate-ping bg-red" : "bg-cyan"}`}
-          />
-          {run.status === "running" ? "Angriff läuft" : run.status === "finished" ? "Lauf beendet" : "Bereit"}
-        </div>
-        {current && (
-          <motion.div key={current.id} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} className="mt-2">
-            <div className="text-lg font-semibold leading-tight">{current.technique}</div>
-            <div className="mt-1 flex flex-wrap gap-1.5 text-[10px]">
-              <span className="rounded bg-panel-2/80 px-1.5 py-0.5 text-muted">{current.moduleLabel}</span>
-              <span className="rounded bg-violet/15 px-1.5 py-0.5 text-violet">{current.owasp}</span>
-              {current.atlas && <span className="rounded bg-cyan/10 px-1.5 py-0.5 text-cyan">{current.atlas}</span>}
-            </div>
-          </motion.div>
-        )}
-      </div>
-
-      <div className="pointer-events-none absolute right-6 top-5 flex items-start gap-5">
-        <Counter value={hits} label="Durchbruch" color="#f43f5e" />
-        <Counter value={blocked} label="Abgewehrt" color="#34d399" />
-        <div className="text-right">
-          <div className={`font-mono text-2xl font-semibold leading-none ${stamp?.hit && full ? "hud-glitch" : ""}`}>
-            {score ?? "--"}
-          </div>
-          <div className="mt-1 text-[9px] uppercase tracking-[0.2em] text-muted">Score</div>
-        </div>
-        <div className="hud-sweep relative h-11 w-11 overflow-hidden rounded-full border border-cyan/40">
-          <span className="absolute inset-[30%] rounded-full border border-cyan/30" />
-        </div>
-      </div>
-
-      {/* Modul-Anzeigen links unten */}
-      <div className="pointer-events-none absolute bottom-[5.5rem] left-6 w-44 space-y-1.5">
-        {run.modules.map((m) => {
-          const rate = m.attempts ? m.hits / m.attempts : 0;
-          return (
-            <div key={m.key}>
-              <div className="flex justify-between font-mono text-[9px] uppercase tracking-wider text-muted">
-                <span className="truncate">{m.label}</span>
-                <span>
-                  {m.hits}/{m.attempts}
-                </span>
-              </div>
-              <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-[#0b1222]">
-                <motion.div className="h-full bg-red shadow-[0_0_6px_#f43f5e]" animate={{ width: `${rate * 100}%` }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Payload-Ticker unten */}
-      <div className="pointer-events-none absolute inset-x-6 bottom-5">
-        {payload && (
-          <div className="mb-2 truncate rounded-md border border-red/30 bg-[#12060b]/80 px-3 py-1.5 font-mono text-[11px] text-red/90">
-            <span className="mr-2 text-red">&gt; payload</span>
-            <Typewriter key={current?.id} text={payload} instant={!full} />
-          </div>
-        )}
-        <div className="flex items-center gap-3 font-mono text-[10px] text-muted">
-          <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-[#0b1222]">
-            <motion.div
-              className="h-full bg-gradient-to-r from-cyan via-violet to-red"
-              animate={{ width: `${progress * 100}%` }}
-              transition={{ type: "spring", stiffness: 80, damping: 20 }}
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-[14px] bg-[#060912]">
+      {/* Zone 1: Statusleiste */}
+      <div className="flex shrink-0 items-center gap-4 border-b border-line/70 px-5 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-cyan">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${run.status === "running" ? "animate-pulse bg-red" : "bg-cyan"}`}
             />
+            {status}
           </div>
-          <span className="tabular-nums">
-            {run.done}/{run.total || "–"}
+          <div className="mt-1 flex items-center gap-2">
+            <span className="truncate text-base font-semibold">{current?.technique ?? "Noch kein Angriff"}</span>
+            {current && (
+              <>
+                <span className="shrink-0 rounded bg-panel-2 px-1.5 py-0.5 text-[10px] text-muted">
+                  {current.moduleLabel}
+                </span>
+                <span className="shrink-0 rounded bg-violet/15 px-1.5 py-0.5 text-[10px] text-violet">
+                  {current.owasp}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="w-32 shrink-0">
+          <AnimatePresence mode="wait">
+            {stamp && (
+              <motion.div
+                key={stamp.id}
+                initial={{ opacity: 0, scale: 1.4 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", stiffness: 420, damping: 22 }}
+                className={`rounded-md border px-3 py-1 text-center font-mono text-xs font-bold uppercase tracking-[0.25em] ${
+                  stamp.hit
+                    ? "border-red bg-red/15 text-red shadow-[0_0_18px_#f43f5e55] " + (full ? "hud-glitch" : "")
+                    : "border-green/70 bg-green/10 text-green"
+                }`}
+              >
+                {stamp.hit ? "Durchbruch" : "Abgewehrt"}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        <div className="flex shrink-0 items-center gap-5">
+          <Counter value={hits} label="Durchbruch" color="#f43f5e" />
+          <Counter value={blocked} label="Abgewehrt" color="#34d399" />
+          <div className="text-right">
+            <div className="font-mono text-2xl font-semibold leading-none">{score ?? "--"}</div>
+            <div className="mt-1 text-[9px] uppercase tracking-[0.2em] text-muted">Score</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Zone 2: Szene, nichts liegt darüber außer den Beschriftungen der Objekte */}
+      <div
+        className={`relative min-h-0 flex-1 bg-[radial-gradient(circle_at_50%_50%,#0f1a3a,#060912_70%)] transition-shadow duration-700 ${
+          stamp?.hit ? "shadow-[inset_0_0_0_1px_#f43f5e,inset_0_0_60px_#f43f5e33]" : ""
+        }`}
+      >
+        <WebGLGuard>
+          <Suspense
+            fallback={<div className="flex h-full items-center justify-center text-xs text-muted">Arena lädt …</div>}
+          >
+            <Arena attacks={run.attacks} runId={run.runId} quality={mode} />
+          </Suspense>
+        </WebGLGuard>
+        <div className="hud-scanlines absolute inset-0 opacity-50" />
+        <Corners />
+        <div className="pointer-events-none absolute left-10 top-4 font-mono text-[9px] uppercase tracking-[0.2em] text-muted/70">
+          Daten
+        </div>
+        <div className="pointer-events-none absolute right-10 top-4 font-mono text-[9px] uppercase tracking-[0.2em] text-muted/70">
+          Tools
+        </div>
+      </div>
+
+      {/* Zone 3: Payload, Fortschritt, Module */}
+      <div className="shrink-0 space-y-2 border-t border-line/70 px-5 py-3">
+        <div className="flex h-7 items-center gap-2 overflow-hidden rounded-md border border-red/25 bg-[#12060b]/70 px-3 font-mono text-[11px] text-red/90">
+          <span className="shrink-0 text-red">&gt; payload</span>
+          <span className="truncate">
+            {payload ? (
+              <Typewriter key={current?.id} text={payload} instant={!full} />
+            ) : (
+              <span className="text-muted">–</span>
+            )}
           </span>
         </div>
+        <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-1">
+            {run.modules.map((m) => {
+              const rate = m.attempts ? m.hits / m.attempts : 0;
+              return (
+                <div key={m.key} className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
+                  <span className={m.hits ? "text-red" : ""}>{m.label}</span>
+                  <span className="relative h-1 w-10 overflow-hidden rounded-full bg-[#0b1222]">
+                    <motion.span className="absolute inset-y-0 left-0 bg-red" animate={{ width: `${rate * 100}%` }} />
+                  </span>
+                  <span className="tabular-nums">
+                    {m.hits}/{m.attempts}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex w-40 shrink-0 items-center gap-2 font-mono text-[10px] text-muted">
+            <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-[#0b1222]">
+              <motion.div
+                className="h-full bg-gradient-to-r from-cyan via-violet to-red"
+                animate={{ width: `${progress * 100}%` }}
+                transition={{ type: "spring", stiffness: 80, damping: 20 }}
+              />
+            </div>
+            <span className="tabular-nums">
+              {run.done}/{run.total || "–"}
+            </span>
+          </div>
+        </div>
       </div>
-
-      {/* Alarm und Urteil */}
-      {stamp?.hit && <div key={`a${stamp.id}`} className="hud-alarm absolute inset-0" />}
-      <AnimatePresence>
-        {stamp && (
-          <motion.div
-            key={stamp.id}
-            initial={{ opacity: 0, scale: 2.2, rotate: -14 }}
-            animate={{ opacity: 1, scale: 1, rotate: -8 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 420, damping: 18 }}
-            className={`pointer-events-none absolute left-1/2 top-[22%] -translate-x-1/2 rounded-lg border-[3px] px-5 py-1.5 font-mono text-xl font-bold uppercase tracking-[0.3em] ${
-              stamp.hit
-                ? "border-red text-red shadow-[0_0_40px_#f43f5e88] " + (full ? "hud-glitch" : "")
-                : "border-green text-green shadow-[0_0_30px_#34d39955]"
-            }`}
-            style={{ background: "#05070ecc" }}
-          >
-            {stamp.hit ? "Durchbruch" : "Abgewehrt"}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

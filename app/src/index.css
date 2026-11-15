@@ -70,7 +70,8 @@ body {
 /* Arena und HUD                                                       */
 
 .arena-label {
-  font: 500 11px/1 var(--font-mono);
+  margin-top: 4px;
+  font: 500 10.5px/1 var(--font-mono);
   letter-spacing: 0.04em;
   color: #c4b5fd;
   padding: 3px 7px;

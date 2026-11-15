@@ -1,7 +1,6 @@
 import { Stars } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Bloom, ChromaticAberration, EffectComposer, Vignette } from "@react-three/postprocessing";
-import { BlendFunction, type ChromaticAberrationEffect } from "postprocessing";
+import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Attack } from "../../lib/runStore";
@@ -14,7 +13,6 @@ import type { Attack } from "../../lib/runStore";
  */
 
 const SHIELD_R = 2.2;
-const ORBIT_R = 3.6;
 const CYAN = new THREE.Color("#22d3ee");
 const RED = new THREE.Color("#f43f5e");
 const VIOLET = new THREE.Color("#a78bfa");
@@ -28,12 +26,13 @@ const MODULE_COLOR: Record<string, string> = {
   cross_account: "#c084fc",
 };
 
+/** Feste Plätze: Daten links, Tools rechts, nichts hinter dem Kern. */
 export const SATELLITES = [
-  { id: "prompt", label: "System-Prompt" },
-  { id: "customers", label: "Kundendaten" },
-  { id: "lookup_order", label: "lookup_order" },
-  { id: "refund", label: "refund" },
-  { id: "send_email", label: "send_email" },
+  { id: "prompt", label: "System-Prompt", kind: "Daten", pos: [-3.7, 1.15, 0.4] },
+  { id: "customers", label: "Kundendaten", kind: "Daten", pos: [-3.7, -1.15, 0.4] },
+  { id: "lookup_order", label: "lookup_order", kind: "Tool", pos: [3.7, 1.5, 0.4] },
+  { id: "refund", label: "refund", kind: "Tool", pos: [3.95, 0, 0.4] },
+  { id: "send_email", label: "send_email", kind: "Tool", pos: [3.7, -1.5, 0.4] },
 ] as const;
 
 type SatId = (typeof SATELLITES)[number]["id"];
@@ -104,9 +103,10 @@ function newFx(): Fx {
 }
 
 function randomStart(seed: number): THREE.Vector3 {
-  const a = seed * 2.399963; // goldener Winkel: Angriffe kommen aus wechselnden Richtungen
-  const y = ((seed * 0.618) % 1) * 2.4 - 1.2;
-  return new THREE.Vector3(Math.cos(a) * 9, y * 2, Math.sin(a) * 9);
+  // Angriffe kommen von hinten oben aus wechselnden Richtungen, nie quer durch die Beschriftungen
+  const a = Math.PI + (((seed * 0.618) % 1) - 0.5) * 1.6;
+  const y = 2 + ((seed * 0.381) % 1) * 2.5;
+  return new THREE.Vector3(Math.sin(a) * 4, y, Math.cos(a) * 9);
 }
 
 function burst(fx: Fx, at: THREE.Vector3, color: THREE.Color, count: number, speed: number) {
@@ -137,28 +137,28 @@ function Core({ fx }: { fx: React.RefObject<Fx> }) {
       shell.current.rotation.x += dt * 0.4;
       shell.current.rotation.y += dt * 0.6;
       // Glitch: bei Durchbruch springt der Kern ruckartig
-      const g = f.breach > 0.3 ? (Math.random() - 0.5) * 0.25 * f.breach : 0;
+      const g = f.breach > 0.5 ? (Math.random() - 0.5) * 0.06 * f.breach : 0;
       shell.current.position.set(g, g * 0.5, -g);
     }
-    if (inner.current) inner.current.scale.setScalar(0.55 + Math.sin(t * 3) * 0.05 + f.breach * 0.25);
+    if (inner.current) inner.current.scale.setScalar(0.42 + Math.sin(t * 2) * 0.02 + f.breach * 0.08);
     shellMat.current?.color.copy(color);
     if (innerMat.current) {
       innerMat.current.emissive.copy(color);
-      innerMat.current.emissiveIntensity = 2.2 + Math.sin(t * 4) * 0.4 + f.breach * 3;
+      innerMat.current.emissiveIntensity = 1.1 + Math.sin(t * 2) * 0.15 + f.breach * 0.9;
     }
   });
 
   return (
     <group>
       <mesh ref={shell}>
-        <icosahedronGeometry args={[0.95, 1]} />
-        <meshBasicMaterial ref={shellMat} wireframe transparent opacity={0.9} toneMapped={false} />
+        <icosahedronGeometry args={[0.8, 1]} />
+        <meshBasicMaterial ref={shellMat} wireframe transparent opacity={0.45} toneMapped={false} />
       </mesh>
       <mesh ref={inner}>
         <sphereGeometry args={[1, 32, 32]} />
         <meshStandardMaterial ref={innerMat} color="#04121a" toneMapped={false} />
       </mesh>
-      <pointLight color="#22d3ee" intensity={8} distance={8} />
+      <pointLight color="#22d3ee" intensity={4} distance={7} />
     </group>
   );
 }
@@ -171,22 +171,24 @@ function Shield({ fx }: { fx: React.RefObject<Fx> }) {
   useFrame((state, dt) => {
     const f = fx.current!;
     f.shieldFlash = Math.max(0, f.shieldFlash - dt * 1.8);
-    const flicker = f.breach > 0.2 ? (Math.random() > 0.5 ? 0.4 : 1) : 1;
+    // Nach einem Treffer kehrt das Schild langsam zu Cyan zurück
+    f.shieldColor.lerp(CYAN, Math.min(1, dt * 0.8));
+    const flicker = 1;
     if (mesh.current) mesh.current.rotation.y -= dt * 0.08;
     if (wire.current) {
       wire.current.color.copy(f.shieldColor);
-      wire.current.opacity = (0.12 + f.shieldFlash * 0.7 + Math.sin(state.clock.elapsedTime * 2) * 0.03) * flicker;
+      wire.current.opacity = (0.05 + f.shieldFlash * 0.3 + Math.sin(state.clock.elapsedTime * 1.5) * 0.01) * flicker;
     }
     if (glow.current) {
       glow.current.color.copy(f.shieldColor);
-      glow.current.opacity = (0.04 + f.shieldFlash * 0.25) * flicker;
+      glow.current.opacity = (0.03 + f.shieldFlash * 0.12) * flicker;
     }
   });
 
   return (
     <group>
       <mesh ref={mesh}>
-        <icosahedronGeometry args={[SHIELD_R, 3]} />
+        <icosahedronGeometry args={[SHIELD_R, 2]} />
         <meshBasicMaterial ref={wire} wireframe transparent toneMapped={false} depthWrite={false} />
       </mesh>
       <mesh>
@@ -204,9 +206,9 @@ function Shield({ fx }: { fx: React.RefObject<Fx> }) {
 }
 
 function satPosition(i: number, t: number, out = new THREE.Vector3()) {
-  const a = t * 0.18 + (i / SATELLITES.length) * Math.PI * 2;
-  // Geneigte Umlaufbahn
-  return out.set(Math.cos(a) * ORBIT_R, Math.sin(a) * ORBIT_R * 0.28, Math.sin(a) * ORBIT_R);
+  const [x, y, z] = SATELLITES[i].pos;
+  // Leichtes Schweben, Position bleibt aber fest
+  return out.set(x, y + Math.sin(t * 0.8 + i * 1.3) * 0.06, z);
 }
 
 function Satellites({ fx, labels }: { fx: React.RefObject<Fx>; labels: React.RefObject<(HTMLDivElement | null)[]> }) {
@@ -237,14 +239,13 @@ function Satellites({ fx, labels }: { fx: React.RefObject<Fx>; labels: React.Ref
       const g = groups.current[i];
       if (g) {
         satPosition(i, t, g.position);
-        g.rotation.x += dt * (0.6 + heat * 4);
-        g.rotation.y += dt * (0.9 + heat * 4);
-        g.scale.setScalar(1 + heat * 0.5 + (heat > 0 ? Math.sin(t * 12) * 0.08 * heat : 0));
+        g.rotation.y += dt * (0.4 + heat * 2);
+        g.scale.setScalar(1 + Math.min(1, heat) * 0.35);
       }
       const m = mats.current[i];
       if (m) {
         m.emissive.copy(VIOLET).lerp(RED, Math.min(1, heat * 1.5));
-        m.emissiveIntensity = 1.2 + heat * 4;
+        m.emissiveIntensity = 0.7 + Math.min(1, heat) * 1.6;
       }
       // Beschriftung als HTML über dem Canvas: Position per Projektion, ohne eigenen React-Root
       const label = labels.current[i];
@@ -252,27 +253,28 @@ function Satellites({ fx, labels }: { fx: React.RefObject<Fx>; labels: React.Ref
         label.dataset.hot = heat > 0.15 ? "1" : "0";
         proj
           .copy(g.position)
-          .setY(g.position.y + 0.42)
+          .setY(g.position.y - 0.32)
           .project(state.camera);
         const x = ((proj.x + 1) / 2) * state.size.width;
         const y = ((1 - proj.y) / 2) * state.size.height;
-        label.style.transform = `translate(-50%, -100%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
-        // Hinter dem Schild liegende Satelliten gedimmt beschriften
-        const behind = state.camera.position.distanceTo(g.position) > state.camera.position.length();
-        label.style.opacity = proj.z >= 1 ? "0" : behind ? "0.35" : "1";
+        label.style.transform = `translate(-50%, 0) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+        label.style.opacity = proj.z >= 1 ? "0" : "1";
       }
       // Strahl vom Kern zum getroffenen Satelliten
       const line = beamLines.current[i];
       if (line) {
-        const visible = heat > 0.05;
-        line.visible = visible;
-        if (visible && g) {
+        line.visible = true;
+        if (g) {
           const pos = beamGeos[i].attributes.position as THREE.BufferAttribute;
           tmp.copy(g.position);
           pos.setXYZ(0, 0, 0, 0);
           pos.setXYZ(1, tmp.x, tmp.y, tmp.z);
           pos.needsUpdate = true;
-          (line.material as THREE.LineBasicMaterial).opacity = Math.min(1, heat) * (0.6 + Math.random() * 0.4);
+          // Ruhig: dünne Verbindung, rot nur bei Treffer
+          const mat = line.material as THREE.LineBasicMaterial;
+          const hot = Math.min(1, heat);
+          mat.color.copy(VIOLET).lerp(RED, hot);
+          mat.opacity = 0.14 + hot * 0.8;
         }
       }
     });
@@ -280,11 +282,6 @@ function Satellites({ fx, labels }: { fx: React.RefObject<Fx>; labels: React.Ref
 
   return (
     <group>
-      {/* Umlaufbahn */}
-      <mesh rotation={[Math.PI / 2 - 0.27, 0, 0]}>
-        <torusGeometry args={[ORBIT_R, 0.006, 8, 160]} />
-        <meshBasicMaterial color="#a78bfa" transparent opacity={0.35} toneMapped={false} />
-      </mesh>
       {SATELLITES.map((s, i) => (
         <group key={s.id}>
           <group
@@ -293,7 +290,7 @@ function Satellites({ fx, labels }: { fx: React.RefObject<Fx>; labels: React.Ref
             }}
           >
             <mesh>
-              <octahedronGeometry args={[0.2, 0]} />
+              <octahedronGeometry args={[0.22, 0]} />
               <meshStandardMaterial
                 ref={(el) => {
                   mats.current[i] = el;
@@ -334,22 +331,22 @@ function Projectiles({ fx }: { fx: React.RefObject<Fx> }) {
         if (p.t >= 1) {
           p.phase = p.outcome === undefined ? "wait" : p.outcome ? "pierce" : "bounce";
           p.t = 0;
-          burst(f, p.impact, p.color, 18, 1.2);
+          burst(f, p.impact, p.color, 8, 1);
           f.shieldFlash = Math.max(f.shieldFlash, 0.5);
         }
       } else if (p.phase === "wait") {
         // Geschoss drückt gegen das Schild, bis der Richter entschieden hat
         p.pos.copy(p.impact).multiplyScalar(1 + Math.sin(p.t * 30) * 0.01);
         p.t += dt;
-        if (Math.random() < dt * 20) burst(f, p.impact, p.color, 2, 0.6);
+        if (Math.random() < dt * 6) burst(f, p.impact, p.color, 1, 0.5);
         if (p.outcome !== undefined) {
           p.phase = p.outcome ? "pierce" : "bounce";
           p.t = 0;
         }
       } else if (p.phase === "bounce") {
         if (p.t === 0) {
-          burst(f, p.impact, CYAN, 70, 2.6);
-          f.shieldFlash = 1;
+          burst(f, p.impact, CYAN, 30, 2);
+          f.shieldFlash = 0.8;
           f.shieldColor.copy(CYAN);
         }
         p.t += dt * 1.6;
@@ -357,7 +354,7 @@ function Projectiles({ fx }: { fx: React.RefObject<Fx> }) {
         if (p.t >= 1) p.phase = "done";
       } else if (p.phase === "pierce") {
         if (p.t === 0) {
-          burst(f, p.impact, RED, 90, 3);
+          burst(f, p.impact, RED, 35, 2.2);
           f.shieldColor.copy(RED);
           f.shieldFlash = 1;
         }
@@ -366,9 +363,9 @@ function Projectiles({ fx }: { fx: React.RefObject<Fx> }) {
         if (p.t >= 1) {
           p.phase = "done";
           f.breach = 1;
-          f.shake = 1;
-          f.waves.push({ t: 0, color: RED.clone() });
-          burst(f, new THREE.Vector3(0, 0, 0), RED, 120, 4);
+          f.shake = 0.5;
+          f.waves = [{ t: 0, color: RED.clone() }];
+          burst(f, new THREE.Vector3(0, 0, 0), RED, 40, 2.5);
           for (const s of p.targets) {
             f.satHeat[s] = 1.6;
           }
@@ -482,15 +479,15 @@ function Shockwaves({ fx }: { fx: React.RefObject<Fx> }) {
       const w = f.waves[i];
       r.visible = !!w;
       if (!w) return;
-      r.scale.setScalar(0.5 + w.t * 9);
+      r.scale.setScalar(0.8 + w.t * 5);
       const m = r.material as THREE.MeshBasicMaterial;
       m.color.copy(w.color);
-      m.opacity = (1 - w.t) * 0.9;
+      m.opacity = (1 - w.t) * 0.45;
     });
   });
   return (
     <group rotation={[-Math.PI / 2, 0, 0]}>
-      {[0, 1, 2, 3].map((i) => (
+      {[0].map((i) => (
         <mesh
           key={i}
           ref={(el) => {
@@ -498,7 +495,7 @@ function Shockwaves({ fx }: { fx: React.RefObject<Fx> }) {
           }}
           visible={false}
         >
-          <ringGeometry args={[0.95, 1, 96]} />
+          <ringGeometry args={[0.97, 1, 96]} />
           <meshBasicMaterial
             transparent
             side={THREE.DoubleSide}
@@ -515,7 +512,7 @@ function Shockwaves({ fx }: { fx: React.RefObject<Fx> }) {
 function PolarGrid() {
   return (
     <group position={[0, -2.6, 0]}>
-      <polarGridHelper args={[9, 16, 8, 96, "#1e3a5f", "#13243d"]} />
+      <polarGridHelper args={[8, 12, 5, 96, "#152a45", "#0e1b2e"]} />
     </group>
   );
 }
@@ -526,39 +523,23 @@ function Rig({ fx }: { fx: React.RefObject<Fx> }) {
   useFrame((state, dt) => {
     const f = fx.current!;
     f.shake = Math.max(0, f.shake - dt * 1.6);
-    f.breach = Math.max(0, f.breach - dt * 0.35);
-    const t = state.clock.elapsedTime * 0.07;
-    // Schmale Bühnen etwas weiter weg, damit die Umlaufbahn nicht abgeschnitten wird
+    f.breach = Math.max(0, f.breach - dt * 0.6);
+    const t = state.clock.elapsedTime * 0.15;
+    // Feste Perspektive; schmale Bühnen weiter weg, damit links und rechts alles sichtbar bleibt
     const aspect = state.size.width / Math.max(1, state.size.height);
-    const r = 8.4 + Math.max(0, 1.6 - aspect) * 2.6 - f.shake * 0.8;
-    camera.position.set(
-      Math.sin(t) * r + (Math.random() - 0.5) * f.shake * 0.35,
-      2.4 + Math.sin(t * 1.7) * 0.4 + (Math.random() - 0.5) * f.shake * 0.35,
-      Math.cos(t) * r,
-    );
+    const r = 9.2 + Math.max(0, 1.9 - aspect) * 4.2;
+    const shake = (Math.random() - 0.5) * f.shake * 0.12;
+    camera.position.set(Math.sin(t) * 0.35 + shake, 1.6 + shake, r);
     camera.lookAt(0, 0, 0);
   });
   return null;
 }
 
-function Effects({ fx }: { fx: React.RefObject<Fx> }) {
-  const chroma = useRef<ChromaticAberrationEffect>(null);
-  const offset = useMemo(() => new THREE.Vector2(0.0006, 0.0006), []);
-  useFrame(() => {
-    const b = fx.current!.breach;
-    chroma.current?.offset.set(0.0006 + b * 0.006, 0.0006 + b * 0.004);
-  });
+function Effects() {
   return (
     <EffectComposer>
-      <Bloom mipmapBlur intensity={1.4} luminanceThreshold={0.12} luminanceSmoothing={0.3} radius={0.75} />
-      <ChromaticAberration
-        ref={chroma}
-        offset={offset}
-        blendFunction={BlendFunction.NORMAL}
-        radialModulation={false}
-        modulationOffset={0}
-      />
-      <Vignette eskil={false} offset={0.2} darkness={0.85} />
+      <Bloom mipmapBlur intensity={0.75} luminanceThreshold={0.35} luminanceSmoothing={0.25} radius={0.6} />
+      <Vignette eskil={false} offset={0.3} darkness={0.6} />
     </EffectComposer>
   );
 }
@@ -620,11 +601,19 @@ export default function Arena({
       <Canvas
         dpr={full ? [1, 2] : 1}
         gl={{ antialias: !full, powerPreference: "high-performance" }}
-        camera={{ fov: 45, position: [0, 2.6, 9.6] }}
+        camera={{ fov: 42, position: [0, 1.6, 9.6] }}
         style={{ background: "transparent" }}
       >
         <ambientLight intensity={0.25} />
-        <Stars radius={60} depth={30} count={full ? 3500 : 700} factor={3} saturation={0} fade speed={full ? 0.8 : 0} />
+        <Stars
+          radius={60}
+          depth={30}
+          count={full ? 1200 : 400}
+          factor={2.5}
+          saturation={0}
+          fade
+          speed={full ? 0.2 : 0}
+        />
         <PolarGrid />
         <Core fx={fx} />
         <Shield fx={fx} />
@@ -634,7 +623,7 @@ export default function Arena({
         <Shockwaves fx={fx} />
         <Rig fx={fx} />
         <Director fx={fx} attacks={attacks} runId={runId} />
-        {full && <Effects fx={fx} />}
+        {full && <Effects />}
       </Canvas>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {SATELLITES.map((s, i) => (
