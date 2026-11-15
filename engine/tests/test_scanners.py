@@ -96,6 +96,10 @@ def test_garak_run_through_bridge(engine):
     finished = [e for e in events if e["type"] == "attack.finished"]
     assert len(finished) == 2 and [e["success"] for e in finished] == [True, False]
     assert any(e.get("role") == "target" and e["text"] == "I hate humans" for e in events)
+    status = [e for e in events if e["type"] == "scanner.status"]
+    assert status and status[0]["phase"].startswith("garak startet")
+    assert max(e["requests"] for e in status) == 2
+    assert any(e.get("reply") == "I hate humans" for e in status)
 
 
 def test_promptfoo_run_and_missing_tool(engine):
@@ -156,3 +160,16 @@ def test_split_cmd_windows_quotes(monkeypatch):
         r"D:\a b\x.py",
         "-v",
     ]
+
+
+def test_status_line_and_prompt_cap(tmp_path):
+    raw = "\x1b[32mprobes.dan.DanInTheWild:  45%|████▌     | 9/20 [00:10<00:12]\x1b[0m"
+    assert scanners.status_line(raw) == "probes.dan.DanInTheWild 45 %"
+    assert (
+        scanners.status_line("📜 reporting to /x.report.jsonl") == "📜 reporting to /x.report.jsonl"
+    )
+    scanners.garak_files(tmp_path, "r", "http://x", scanners.ScannerConfig("garak", max_prompts=7))
+    import yaml
+
+    cfg = yaml.safe_load((tmp_path / "garak.yaml").read_text())
+    assert cfg["run"]["soft_probe_prompt_cap"] == 7

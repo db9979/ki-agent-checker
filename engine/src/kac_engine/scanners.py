@@ -21,6 +21,7 @@ import secrets
 import shlex
 import shutil
 import tempfile
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -116,6 +117,7 @@ class ScannerConfig:
     probes: str = ""  # garak: Probes; promptfoo: Plugins oder Preset
     purpose: str = ""  # promptfoo: Zweck des Agenten
     num_tests: int = 3
+    max_prompts: int = 20  # garak: höchstens so viele Prompts je Probe (soft_probe_prompt_cap)
     extra_env: dict[str, str] = field(default_factory=dict)
 
 
@@ -344,7 +346,7 @@ def garak_files(workdir: Path, run_id: str, bridge_url: str, cfg: ScannerConfig)
     (workdir / "rest.json").write_text(json.dumps(options), encoding="utf-8")
     config = {
         "system": {"lite": True, "show_z": False},
-        "run": {"generations": 1},
+        "run": {"generations": 1, "soft_probe_prompt_cap": cfg.max_prompts},
         "reporting": {"report_dir": str(workdir), "report_prefix": f"kac-{run_id}"},
     }
     (workdir / "garak.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
@@ -388,6 +390,18 @@ def promptfoo_config(bridge_url: str, cfg: ScannerConfig) -> dict:
     }
 
 
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+PROGRESS = re.compile(r"(probes\.[\w.]+)[^%]*?(\d+)%")
+
+
+def status_line(raw: str) -> str:
+    """Bereinigt eine Ausgabezeile (Farben, Fortschrittsbalken) für die Anzeige."""
+    line = ANSI.sub("", raw).strip()
+    if m := PROGRESS.search(line):
+        return f"{m.group(1)} {m.group(2)} %"
+    return re.sub(r"[█▉▊▋▌▍▎▏|]{3,}", "", line).strip()[:200]
+
+
 async def run_scanner(
     hub: EventHub,
     store: Store,
@@ -403,7 +417,45 @@ async def run_scanner(
 ) -> str:
     store.start_run(run_id, project_id, f"{label} · {cfg.tool}")
     await hub.publish("run.started", run_id, target=f"{label} · {cfg.tool}", total=0, modules=[])
-    key = bridge.open(reply)
+    requests = 0
+    started = time.monotonic()
+    last_status = 0.0
+    phase = f"{cfg.tool} startet"
+    if cfg.tool == "garak":
+        phase += " (lädt beim ersten Mal PyTorch, das kann 1 bis 2 Minuten dauern)"
+    elif cfg.tool == "promptfoo":
+        phase += " (lädt beim ersten Mal das npm-Paket)"
+
+    async def report_status(force: bool = False, **extra: object) -> None:
+        nonlocal last_status
+        now = time.monotonic()
+        if not force and now - last_status < 1.0:
+            return
+        last_status = now
+        await hub.publish(
+            "scanner.status",
+            run_id,
+            tool=cfg.tool,
+            phase=phase,
+            requests=requests,
+            errors=len(bridge.errors.get(key) or []),
+            results=len(hits),
+            elapsed=round(now - started),
+            **extra,
+        )
+
+    async def counted(message: str) -> str:
+        nonlocal requests
+        requests += 1
+        try:
+            answer = await reply(message)
+        except Exception as exc:
+            await report_status(force=True, prompt=message[:300], reply=f"Fehler: {exc}"[:300])
+            raise
+        await report_status(force=requests == 1, prompt=message[:300], reply=answer[:300])
+        return answer
+
+    key = bridge.open(counted)
     bridge_url = f"{engine_url}/bridge/{key}"
     hits: list[Hit] = []
     status = "finished"
@@ -454,7 +506,7 @@ async def run_scanner(
         )
 
     async def stream(cmd: list[str]) -> int:
-        nonlocal proc
+        nonlocal proc, phase
         try:
             proc = await asyncio.create_subprocess_exec(
                 *resolve(cmd),
@@ -486,23 +538,36 @@ async def run_scanner(
                     if hit := garak_attempt(entry):
                         await emit(hit)
 
+        pending = ""
         while True:
             try:
-                raw = await asyncio.wait_for(proc.stdout.readline(), 1.0)
+                # Stückweise lesen: Fortschrittsbalken enden mit \r statt mit einem Zeilenumbruch
+                raw = await asyncio.wait_for(proc.stdout.read(4096), 1.0)
             except TimeoutError:
                 raw = None
             if raw:
-                line = raw.decode(errors="replace").rstrip()
-                tail.append(line)
-                del tail[:-30]
-                if m := re.search(r"reporting to (\S+\.report\.jsonl)", line):
-                    report = Path(m.group(1))
+                pending += raw.decode(errors="replace")
+                *parts, pending = re.split(r"[\r\n]", pending)
+                for part in parts:
+                    line = part.rstrip()
+                    if not line.strip():
+                        continue
+                    tail.append(line)
+                    del tail[:-30]
+                    if m := re.search(r"reporting to (\S+\.report\.jsonl)", line):
+                        report = Path(m.group(1))
+                    if shown := status_line(line):
+                        phase = shown
             elif raw == b"":
+                if pending.strip():
+                    tail.append(pending.rstrip())
                 break
+            await report_status()
             if cfg.tool == "garak":
                 report = report or next(workdir.glob("*.report.jsonl"), None)
                 await read_report()
         code = await proc.wait()
+        await report_status(force=True)
         if cfg.tool == "garak":
             report = report or next(workdir.glob("*.report.jsonl"), None)
             await read_report()
@@ -510,6 +575,7 @@ async def run_scanner(
 
     try:
         base = split_cmd(cfg.cmd, cfg.tool)
+        await report_status(force=True)
         if cfg.tool == "garak":
             code = await stream([*base, *garak_files(workdir, run_id, bridge_url, cfg)])
             if code != 0 and not hits:

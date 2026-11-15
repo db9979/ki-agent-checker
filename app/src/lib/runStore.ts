@@ -28,6 +28,17 @@ export interface ModuleState {
   hits: number;
 }
 
+export interface ScannerStatus {
+  tool: string;
+  phase: string;
+  requests: number;
+  errors: number;
+  results: number;
+  elapsed: number;
+  prompt?: string;
+  reply?: string;
+}
+
 export interface RunState {
   runId: string | null;
   status: "idle" | "running" | "finished";
@@ -40,6 +51,7 @@ export interface RunState {
   findings: Finding[];
   online: boolean;
   error: string | null;
+  scanner: ScannerStatus | null;
 }
 
 const initial: RunState = {
@@ -54,6 +66,7 @@ const initial: RunState = {
   findings: [],
   online: false,
   error: null,
+  scanner: null,
 };
 
 let state: RunState = initial;
@@ -156,6 +169,14 @@ export function reduce(s: RunState, e: EngineEvent): RunState {
           m.key === e.module ? { ...m, attempts: m.attempts + 1, hits: m.hits + (e.success ? 1 : 0) } : m,
         ),
       };
+    case "scanner.status": {
+      const next = e as unknown as ScannerStatus;
+      // Ohne neue Anfrage bleiben die letzten Prompt- und Antworttexte stehen
+      return {
+        ...s,
+        scanner: { ...next, prompt: next.prompt ?? s.scanner?.prompt, reply: next.reply ?? s.scanner?.reply },
+      };
+    }
     case "run.error":
       return { ...s, error: e.error as string };
     case "run.finished":

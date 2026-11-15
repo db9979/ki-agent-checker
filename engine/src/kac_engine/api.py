@@ -68,6 +68,7 @@ class ScannerIn(BaseModel):
     probes: str = ""
     purpose: str = ""
     num_tests: int = Field(default=3, ge=1, le=20)
+    max_prompts: int = Field(default=20, ge=1, le=256)
 
 
 class RunIn(BaseModel):
