@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 
 import httpx
@@ -103,19 +104,26 @@ def _hint(message: str) -> str:
     return ""
 
 
-async def chat(
+async def chat_message(
     provider: Provider,
     api_key: str | None,
     messages: list[dict],
     *,
+    tools: list[dict] | None = None,
     max_tokens: int = 512,
     temperature: float = 0.7,
     timeout: float = 60,
-) -> str:
+) -> dict:
+    """Eine Chat-Antwort inklusive Tool-Aufrufen.
+
+    Rückgabe: ``{"content": str, "tool_calls": [{"id", "name", "args"}]}``.
+    """
     kwargs = completion_kwargs(provider, api_key)
     http: httpx.AsyncClient | None = None
     if not provider.verify_tls and kwargs["model"].startswith("openai/"):
         kwargs["client"], http = _insecure_client(kwargs)
+    if tools:
+        kwargs["tools"] = tools
     try:
         response = await litellm.acompletion(
             **kwargs,
@@ -127,7 +135,35 @@ async def chat(
     finally:
         if http is not None:
             await http.aclose()
-    return response.choices[0].message.content or ""
+    message = response.choices[0].message
+    calls = []
+    for call in getattr(message, "tool_calls", None) or []:
+        try:
+            args = json.loads(call.function.arguments or "{}")
+        except (json.JSONDecodeError, TypeError):
+            args = {"_raw": str(call.function.arguments)}
+        calls.append({"id": call.id, "name": call.function.name, "args": args})
+    return {"content": message.content or "", "tool_calls": calls}
+
+
+async def chat(
+    provider: Provider,
+    api_key: str | None,
+    messages: list[dict],
+    *,
+    max_tokens: int = 512,
+    temperature: float = 0.7,
+    timeout: float = 60,
+) -> str:
+    result = await chat_message(
+        provider,
+        api_key,
+        messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        timeout=timeout,
+    )
+    return result["content"]
 
 
 async def test_connection(provider: Provider, api_key: str | None) -> ConnectionResult:

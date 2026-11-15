@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import time
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
@@ -12,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import __version__, providers
+from . import attacks as attack_lib
 from .demo import run_demo
 from .events import EventHub
 from .keystore import SecretStore
@@ -24,7 +27,17 @@ from .models import (
     ProviderKind,
     RunSummary,
 )
+from .runner import Conversations, RunConfig, run_target
 from .store import Store
+from .targets import (
+    SECRET_FIELDS,
+    Account,
+    Target,
+    TargetIn,
+    TargetKind,
+    in_scope,
+    secret_key,
+)
 
 ALLOWED_ORIGINS = [
     "tauri://localhost",
@@ -40,6 +53,12 @@ class DiscoverIn(BaseModel):
     base_url: str | None = None
     api_key: str | None = None
     verify_tls: bool = True
+
+
+class RunIn(BaseModel):
+    target_id: str
+    modules: list[str] | None = None
+    judge_provider_id: str | None = None
 
 
 class DemoRunIn(BaseModel):
@@ -64,7 +83,7 @@ def create_app(
     store = Store(db_path)
     hub = EventHub()
     keys = secrets or SecretStore()
-    tasks: set[asyncio.Task] = set()
+    tasks: dict[str, asyncio.Task] = {}
     app.state.store, app.state.hub, app.state.keys = store, hub, keys
 
     def check(supplied: str | None) -> None:
@@ -140,6 +159,99 @@ def create_app(
         )
         return project
 
+    # Ziele ----------------------------------------------------------------
+    @app.get("/targets", dependencies=protected)
+    def list_targets(project_id: str | None = None) -> list[Target]:
+        return store.list_targets(project_id)
+
+    @app.post("/targets", dependencies=protected, status_code=201)
+    def add_target(data: TargetIn) -> Target:
+        project = store.get_project(data.project_id)
+        if not project:
+            raise HTTPException(404, "Projekt nicht gefunden")
+        if data.kind == TargetKind.MODEL:
+            if not data.provider_id or not store.get_provider(data.provider_id):
+                raise HTTPException(422, "Bitte ein angebundenes Modell auswählen")
+        else:
+            if not data.url:
+                raise HTTPException(422, "Adresse des Ziels fehlt")
+            for url in filter(None, [data.url, data.auth.login_url]):
+                if not in_scope(url, project.scope):
+                    raise HTTPException(
+                        403,
+                        f"{url} liegt nicht im Scope des Projekts. Erlaubt: {', '.join(project.scope) or 'nichts'}",
+                    )
+        names = [a.name for a in data.accounts]
+        if len(names) != len(set(names)):
+            raise HTTPException(422, "Testkonten brauchen eindeutige Namen")
+        target = Target(
+            id=uuid.uuid4().hex[:12],
+            created_at=datetime.now(UTC),
+            accounts=[
+                Account(
+                    name=a.name,
+                    role=a.role,
+                    username=a.username,
+                    identifier=a.identifier,
+                    marker=a.marker,
+                    has_password=bool(a.password),
+                    has_token=bool(a.token),
+                    has_totp=bool(a.totp_secret),
+                )
+                for a in data.accounts
+            ],
+            **data.model_dump(exclude={"accounts"}),
+        )
+        for a in data.accounts:
+            for field in SECRET_FIELDS:
+                value = getattr(a, field)
+                if value:
+                    keys.set(secret_key(target.id, a.name, field), value)
+        store.save_target(target)
+        store.audit(
+            "target.added",
+            {
+                "id": target.id,
+                "project": project.id,
+                "kind": target.kind,
+                "url": target.url,
+                "accounts": names,
+            },
+        )
+        return target
+
+    @app.delete("/targets/{target_id}", dependencies=protected, status_code=204)
+    def delete_target(target_id: str) -> None:
+        target = store.get_target(target_id)
+        if not target or not store.delete_target(target_id):
+            raise HTTPException(404, "Ziel nicht gefunden")
+        for a in target.accounts:
+            for field in SECRET_FIELDS:
+                keys.delete(secret_key(target_id, a.name, field))
+        store.audit("target.deleted", {"id": target_id})
+
+    @app.post("/targets/{target_id}/check", dependencies=protected)
+    async def check_target(target_id: str) -> ConnectionResult:
+        """Harmlose Testnachricht, prüft Erreichbarkeit und Anmeldung."""
+        target = store.get_target(target_id)
+        if not target:
+            raise HTTPException(404, "Ziel nicht gefunden")
+        provider = store.get_provider(target.provider_id) if target.provider_id else None
+        convo = Conversations(RunConfig(target=target, modules=[], provider=provider), keys)
+        start = time.perf_counter()
+        try:
+            reply, _ = await convo.reply(
+                0 if target.accounts else -1,
+                [{"role": "user", "content": "Hallo! Wobei kannst du mir helfen?"}],
+            )
+        except Exception as exc:  # noqa: BLE001
+            return ConnectionResult(ok=False, error=providers.describe_error(exc))
+        finally:
+            await convo.close()
+        return ConnectionResult(
+            ok=True, latency_ms=int((time.perf_counter() - start) * 1000), reply=reply.strip()[:300]
+        )
+
     # Testläufe -----------------------------------------------------------
     @app.get("/runs", dependencies=protected)
     def list_runs() -> list[RunSummary]:
@@ -158,9 +270,70 @@ def create_app(
                 hub, store, project_id=data.project_id, delay=max(0.0, data.delay), run_id=run_id
             )
         )
-        tasks.add(task)
-        task.add_done_callback(tasks.discard)
+        tasks[run_id] = task
+        task.add_done_callback(lambda _: tasks.pop(run_id, None))
         return {"run_id": run_id}
+
+    @app.post("/runs", dependencies=protected, status_code=202)
+    async def start_run(data: RunIn) -> dict:
+        target = store.get_target(data.target_id)
+        if not target:
+            raise HTTPException(404, "Ziel nicht gefunden")
+        project = store.get_project(target.project_id)
+        if not project:
+            raise HTTPException(422, "Projekt des Ziels fehlt")
+        if target.url and not in_scope(target.url, project.scope):
+            raise HTTPException(403, "Das Ziel liegt nicht im Scope des Projekts")
+        modules = data.modules or attack_lib.MODULE_KEYS
+        unknown = set(modules) - set(attack_lib.MODULE_KEYS)
+        if unknown:
+            raise HTTPException(422, f"Unbekannte Module: {', '.join(sorted(unknown))}")
+        provider = store.get_provider(target.provider_id) if target.provider_id else None
+        if target.kind == TargetKind.MODEL and not provider:
+            raise HTTPException(422, "Für dieses Ziel ist kein Modell ausgewählt")
+        judge = store.get_provider(data.judge_provider_id) if data.judge_provider_id else None
+        run_id = uuid.uuid4().hex[:12]
+        store.audit(
+            "run.started",
+            {
+                "id": run_id,
+                "kind": "target",
+                "target": target.id,
+                "project": project.id,
+                "modules": modules,
+            },
+        )
+        cfg = RunConfig(
+            target=target, modules=modules, provider=provider, judge=judge, project_id=project.id
+        )
+        task = asyncio.create_task(run_target(hub, store, keys, cfg, run_id=run_id))
+        tasks[run_id] = task
+        task.add_done_callback(lambda _: tasks.pop(run_id, None))
+        return {"run_id": run_id}
+
+    @app.post("/runs/{run_id}/cancel", dependencies=protected, status_code=202)
+    async def cancel_run(run_id: str) -> dict:
+        task = tasks.get(run_id)
+        if not task:
+            raise HTTPException(404, "Kein laufender Lauf mit dieser ID")
+        task.cancel()
+        store.audit("run.cancelled", {"id": run_id})
+        return {"ok": True}
+
+    @app.get("/attack-modules", dependencies=protected)
+    def attack_modules() -> list[dict]:
+        return [
+            {
+                "key": m.key,
+                "label": m.label,
+                "owasp": m.owasp,
+                "severity": m.severity.value,
+                "attacks": len(m.attacks),
+                "needs_accounts": m.needs_accounts,
+                "title": m.title,
+            }
+            for m in attack_lib.LIBRARY
+        ]
 
     @app.get("/audit", dependencies=protected)
     def audit() -> list[dict]:

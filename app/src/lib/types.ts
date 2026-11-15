@@ -65,3 +65,57 @@ export interface EngineEvent {
   ts: string;
   [key: string]: unknown;
 }
+
+export type TargetKind = "model" | "openai_endpoint" | "http";
+export type AuthKind = "none" | "bearer" | "header" | "basic" | "login";
+
+export interface AuthConfig {
+  kind: AuthKind;
+  header_name: string;
+  login_url: string | null;
+  login_body: string;
+  token_path: string | null;
+  token_header: string;
+  token_prefix: string;
+}
+
+export interface Account {
+  name: string;
+  role: string;
+  username: string | null;
+  identifier: string | null;
+  marker: string | null;
+  has_password: boolean;
+  has_token: boolean;
+  has_totp: boolean;
+}
+
+export interface Target {
+  id: string;
+  project_id: string;
+  name: string;
+  kind: TargetKind;
+  provider_id: string | null;
+  system_prompt: string;
+  honeypot_tools: boolean;
+  url: string | null;
+  model: string | null;
+  request_template: string;
+  response_path: string;
+  verify_tls: boolean;
+  auth: AuthConfig;
+  accounts: Account[];
+  leak_markers: string[];
+  delay: number;
+  created_at: string;
+}
+
+export interface AttackModuleInfo {
+  key: string;
+  label: string;
+  owasp: string;
+  severity: Severity;
+  attacks: number;
+  needs_accounts: number;
+  title: string;
+}

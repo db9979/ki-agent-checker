@@ -25,6 +25,7 @@ const MODULE_COLOR: Record<string, string> = {
   system_prompt_leak: "#f59e0b",
   data_exfiltration: "#e879f9",
   excessive_agency: "#ef4444",
+  cross_account: "#c084fc",
 };
 
 export const SATELLITES = [
@@ -45,6 +46,8 @@ function targetsFor(a: Attack): SatId[] {
       return ["prompt"];
     case "data_exfiltration":
       return ["lookup_order", "customers"];
+    case "cross_account":
+      return ["customers"];
     case "excessive_agency":
       return tool === "send_email" ? ["send_email"] : ["refund", "send_email"];
     default:

@@ -10,7 +10,7 @@ die Ergebnisse visualisiert und Gegenmaßnahmen vorschlägt. Selbst gehostete Mo
 > Berechtigung hast. Jedes Projekt verlangt eine Bestätigung, und jeder Lauf
 > landet im Audit-Log.
 
-## Stand: Grundgerüst (Phase 1)
+## Stand: Phase 2 (echte Tests)
 
 | Bereich | Enthalten |
 | --- | --- |
@@ -20,8 +20,24 @@ die Ergebnisse visualisiert und Gegenmaßnahmen vorschlägt. Selbst gehostete Mo
 | Projekte | Scope-Liste, Berechtigungsbestätigung, Audit-Log |
 | Visualisierung | Dashboard mit Security-Score, Heatmap Modul × OWASP LLM Top 10, Radar, Score-Verlauf, 3D-Angriffsarena mit HUD, Angriffsgraph mit Datenstrom, Zeitleiste zum Abspielen eines Laufs |
 | Demo-Lauf | Vorbereiteter Lauf gegen einen fiktiven Kundenservice-Agenten, braucht kein Modell |
+| Ziele | Eigenes Modell mit System-Prompt und Honeypot-Tools, Agent mit OpenAI-kompatibler API oder beliebiger HTTP-Endpunkt (JSON-Vorlage) |
+| Anmeldung | API-Schlüssel, eigener Header, Basic Auth, Login-Aufruf mit Token oder Cookie, TOTP für 2FA, mehrere Testkonten mit Rollen |
+| Testmodule | 23 Angriffe: Prompt Injection, Jailbreak, System-Prompt-Leak, Datenabfluss, Tool-Missbrauch, Zugriff auf fremde Kontodaten |
+| Bewertung | Canary-Token, Honeypot-Tool-Aufrufe, Leak-Marker, private Angaben anderer Konten; optional Richter-Modell für unklare Fälle |
 
-Echte Testmodule gegen eigene Agenten folgen in Phase 2 (siehe Konzept).
+### Einen eigenen Agenten testen
+
+1. Unter **Modelle** ein Modell verbinden (für „Eigenes Modell“ und als optionalen Richter).
+2. Unter **Projekte** ein Projekt mit Scope anlegen, z. B. `agent.firma.de` oder `https://agent.firma.de/api`.
+   Ziele außerhalb des Scopes lehnt die Engine ab.
+3. Mit **+ Ziel** das Ziel einrichten. Für Agenten hinter einer Anmeldung die Anmeldeart wählen und Testkonten
+   anlegen. Mit zwei Konten samt Kennung (z. B. E-Mail) und privater Angabe (z. B. IBAN) prüft die App,
+   ob ein Konto an die Daten des anderen kommt. Passwörter, Tokens und TOTP-Geheimnisse liegen im Schlüsselbund.
+4. **Prüfen** schickt eine harmlose Nachricht, **Testen** startet den Angriff. Der Lauf erscheint live in der Arena.
+
+| Ziele und Testlauf | Echter Lauf mit Login und zwei Konten |
+| --- | --- |
+| ![Ziele](docs/screenshots/ziele.png) | ![Echter Lauf](docs/screenshots/echter-lauf.png) |
 
 ![Angriffsarena](docs/screenshots/arena.gif)
 
@@ -110,6 +126,6 @@ und ein Windows-Code-Signing-Zertifikat benötigt.
 
 ## Grundlage
 
-Die Testplaybooks und Gegenmaßnahmen werden ab Phase 2 aus
+Der Import weiterer Testplaybooks und Gegenmaßnahmen folgt aus
 [mukul975/Anthropic-Cybersecurity-Skills](https://github.com/mukul975/Anthropic-Cybersecurity-Skills)
 (Apache 2.0) importiert. Das Projekt ist nicht mit Anthropic verbunden.

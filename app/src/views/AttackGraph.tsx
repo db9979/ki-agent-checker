@@ -193,6 +193,7 @@ const EDGES: { from: string; to: string; module: string; label?: string }[] = [
   { from: "agent", to: "refund", module: "excessive_agency", label: "ohne Bestätigung" },
   { from: "agent", to: "email", module: "excessive_agency" },
   { from: "email", to: "evil", module: "excessive_agency", label: "Mail nach außen" },
+  { from: "agent", to: "customers", module: "cross_account", label: "fremdes Konto" },
 ];
 
 export function AttackGraph() {

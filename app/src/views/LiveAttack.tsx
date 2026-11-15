@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, CheckCircle2, Crosshair, Gavel, Play, Radio, Siren, XCircle } from "lucide-react";
+import { Bot, CheckCircle2, Crosshair, Gavel, Play, Radio, Siren, Square, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ArenaStage } from "../components/hud/ArenaStage";
 import { ReplayBar } from "../components/hud/ReplayBar";
+import { api } from "../lib/engine";
 import { type Attack, type Message, useRun } from "../lib/runStore";
 import { useEffectsMode } from "../lib/settings";
 
@@ -17,6 +18,8 @@ const SIGNAL_LABEL: Record<string, string> = {
   honeypot: "Honeypot-Tool aufgerufen",
   pattern: "Angriffsmuster in der Antwort",
   llm: "vom Richter-Modell bewertet",
+  error: "Fehler",
+  marker: "geschützte Daten in der Antwort",
 };
 
 /** Hebt Canary-Token, externe URLs und typische Angriffswörter hervor. */
@@ -118,14 +121,30 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
           </h1>
           <p className="text-sm text-muted">{run.target || "Starte einen Lauf, um Angriffe live zu verfolgen"}</p>
         </div>
-        <button
-          onClick={onStartDemo}
-          disabled={run.status === "running"}
-          className="glow-cyan flex items-center gap-2 rounded-xl bg-cyan/15 px-4 py-2 text-sm font-medium text-cyan transition hover:bg-cyan/25 disabled:opacity-40"
-        >
-          <Play size={16} /> Demo-Lauf starten
-        </button>
+        <div className="flex items-center gap-2">
+          {run.status === "running" && run.runId && (
+            <button
+              onClick={() => api(`/runs/${run.runId}/cancel`, { method: "POST" }).catch(() => undefined)}
+              className="flex items-center gap-2 rounded-xl border border-red/40 px-3 py-2 text-sm text-red transition hover:bg-red/10"
+            >
+              <Square size={14} /> Abbrechen
+            </button>
+          )}
+          <button
+            onClick={onStartDemo}
+            disabled={run.status === "running"}
+            className="glow-cyan flex items-center gap-2 rounded-xl bg-cyan/15 px-4 py-2 text-sm font-medium text-cyan transition hover:bg-cyan/25 disabled:opacity-40"
+          >
+            <Play size={16} /> Demo-Lauf starten
+          </button>
+        </div>
       </header>
+
+      {run.error && (
+        <div className="col-span-12 flex items-center gap-2 rounded-xl border border-red/40 bg-red/10 px-4 py-2 text-sm text-red">
+          <XCircle size={16} /> {run.error}
+        </div>
+      )}
 
       <section className="panel col-span-12 h-[calc(100vh-13rem)] min-h-[380px] p-0 xl:col-span-8">
         <ArenaStage run={run} mode={mode} />
@@ -137,7 +156,9 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
             <>
               <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-xs">
                 <span className="truncate font-medium">{current.technique}</span>
-                <span className="ml-auto shrink-0 rounded-md bg-violet/15 px-2 py-0.5 text-[10px] text-violet">{current.owasp}</span>
+                <span className="ml-auto shrink-0 rounded-md bg-violet/15 px-2 py-0.5 text-[10px] text-violet">
+                  {current.owasp}
+                </span>
               </div>
               <div ref={streamRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
                 {current.messages.map((m, i) => (
