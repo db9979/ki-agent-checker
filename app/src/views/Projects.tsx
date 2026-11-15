@@ -121,7 +121,9 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
                   setOff(next);
                 }}
               />
-              {m.label} {m.attacks > 0 && <span className="text-[10px] text-muted">({m.attacks})</span>}
+              <span className="truncate">{m.label}</span>{" "}
+              {m.skill && <span className="rounded bg-violet/15 px-1 text-[9px] text-violet">Skill</span>}
+              {m.attacks > 0 && <span className="text-[10px] text-muted">({m.attacks})</span>}
             </label>
           );
         })}

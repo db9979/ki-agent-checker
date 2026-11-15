@@ -7,13 +7,15 @@ import { ScoreGauge } from "../components/ScoreGauge";
 import { SeverityBars } from "../components/SeverityBars";
 import { MODULES } from "../lib/modules";
 import { liveScore, useRun } from "../lib/runStore";
-import type { Finding, RunSummary } from "../lib/types";
+import { openLink } from "../lib/open";
+import type { Finding, RunSummary, Skill } from "../lib/types";
 import { useApi } from "../lib/useApi";
 import { OWASP_LABEL, SEVERITY_COLOR, SEVERITY_LABEL } from "../lib/ui";
 
 export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
   const run = useRun();
   const { data: runs } = useApi<RunSummary[]>("/runs", [run.status]);
+  const { data: skills } = useApi<Skill[]>("/skills");
   const finished = (runs ?? []).filter((r) => r.status === "finished");
   const last = finished.at(-1) ?? null;
   const live = run.status !== "idle";
@@ -139,11 +141,36 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
                   <span className="font-medium text-green">Gegenmaßnahme: </span>
                   {f.remediation}
                 </p>
+                <RelatedSkills finding={f} skills={skills ?? []} />
               </motion.div>
             ))}
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+/** Importierte Skills zur selben OWASP-Kategorie: Gegenmaßnahmen und Prüfliste zum Nachlesen. */
+function RelatedSkills({ finding, skills }: { finding: Finding; skills: Skill[] }) {
+  const related = skills
+    .filter((s) => s.module_key !== finding.module && s.owasp.includes(finding.owasp))
+    .filter((s) => s.remediation.length || s.checklist.length)
+    .slice(0, 3);
+  if (!related.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+      <span className="text-muted">Mehr dazu:</span>
+      {related.map((s) => (
+        <button
+          key={s.name}
+          onClick={() => openLink(s.source)}
+          title={[...s.remediation.slice(0, 3), ...s.checklist.slice(0, 3)].join("\n")}
+          className="rounded-md bg-cyan/10 px-2 py-0.5 text-cyan hover:bg-cyan/20"
+        >
+          {s.title}
+        </button>
+      ))}
     </div>
   );
 }

@@ -121,4 +121,23 @@ export interface AttackModuleInfo {
   title: string;
   target: "agent" | "mcp";
   calls_tools?: boolean;
+  skill?: boolean;
+}
+
+export interface Skill {
+  name: string;
+  title: string;
+  description: string;
+  owasp: string[];
+  atlas: string[];
+  tags: string[];
+  author: string | null;
+  license: string | null;
+  source: string;
+  groups: { title: string; payloads: string[] }[];
+  remediation: string[];
+  checklist: string[];
+  imported_at: string;
+  payload_count: number;
+  module_key: string | null;
 }

@@ -19,6 +19,7 @@ from .models import (
     ProviderKind,
     RunSummary,
 )
+from .skills import Skill
 from .targets import Target
 
 SCHEMA = """
@@ -56,6 +57,10 @@ CREATE TABLE IF NOT EXISTS targets (
     project_id TEXT NOT NULL,
     config TEXT NOT NULL,
     created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS skills (
+    name TEXT PRIMARY KEY,
+    config TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -284,6 +289,25 @@ class Store:
     def get_target(self, target_id: str) -> Target | None:
         row = self._db.execute("SELECT * FROM targets WHERE id = ?", (target_id,)).fetchone()
         return self._target(row) if row else None
+
+    # Skills ---------------------------------------------------------------
+    def save_skills(self, skills: list[Skill]) -> None:
+        with self._lock:
+            self._db.executemany(
+                "INSERT OR REPLACE INTO skills VALUES (?, ?)",
+                [(s.name, s.model_dump_json()) for s in skills],
+            )
+            self._db.commit()
+
+    def list_skills(self) -> list[Skill]:
+        rows = self._db.execute("SELECT config FROM skills ORDER BY name").fetchall()
+        return [Skill.model_validate_json(r["config"]) for r in rows]
+
+    def delete_skill(self, name: str) -> bool:
+        with self._lock:
+            cur = self._db.execute("DELETE FROM skills WHERE name = ?", (name,))
+            self._db.commit()
+        return cur.rowcount > 0
 
     def delete_target(self, target_id: str) -> bool:
         with self._lock:

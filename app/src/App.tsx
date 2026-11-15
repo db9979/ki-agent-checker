@@ -1,4 +1,14 @@
-import { Activity, FolderKanban, Gauge, LayoutDashboard, Network, Server, ShieldHalf, Sparkles } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  FolderKanban,
+  Gauge,
+  LayoutDashboard,
+  Network,
+  Server,
+  ShieldHalf,
+  Sparkles,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, subscribe } from "./lib/engine";
 import { dispatch, setOnline, useRun } from "./lib/runStore";
@@ -8,6 +18,7 @@ import { Dashboard } from "./views/Dashboard";
 import { LiveAttack } from "./views/LiveAttack";
 import { Models } from "./views/Models";
 import { Projects } from "./views/Projects";
+import { Skills } from "./views/Skills";
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -15,6 +26,7 @@ const NAV = [
   { id: "graph", label: "Angriffsgraph", icon: Network },
   { id: "models", label: "Modelle", icon: Server },
   { id: "projects", label: "Projekte", icon: FolderKanban },
+  { id: "skills", label: "Skills", icon: BookOpen },
 ] as const;
 
 type View = (typeof NAV)[number]["id"];
@@ -90,6 +102,7 @@ export default function App() {
         {view === "graph" && <AttackGraph />}
         {view === "models" && <Models />}
         {view === "projects" && <Projects onRunStarted={() => setView("live")} />}
+        {view === "skills" && <Skills />}
       </main>
     </div>
   );
