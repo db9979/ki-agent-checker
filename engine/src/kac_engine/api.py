@@ -8,12 +8,14 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from . import __version__, mcp, providers
+from . import __version__, mcp, providers, skills
 from . import attacks as attack_lib
 from .demo import run_demo
 from .events import EventHub
@@ -64,6 +66,14 @@ class RunIn(BaseModel):
     )
 
 
+class SkillImportIn(BaseModel):
+    source: Literal["github", "folder"] = "github"
+    repo: str = skills.DEFAULT_REPO
+    ref: str = "main"
+    path: str | None = None
+    only_ai: bool = True
+
+
 class CheckIn(BaseModel):
     mfa_codes: dict[str, str] = Field(default_factory=dict)
 
@@ -92,6 +102,7 @@ def create_app(
     keys = secrets or SecretStore()
     tasks: dict[str, asyncio.Task] = {}
     app.state.store, app.state.hub, app.state.keys = store, hub, keys
+    attack_lib.register([m for s in store.list_skills() if (m := skills.to_module(s))])
 
     def check(supplied: str | None) -> None:
         if token is None:
@@ -342,8 +353,10 @@ def create_app(
             raise HTTPException(422, "Projekt des Ziels fehlt")
         if target.url and not in_scope(target.url, project.scope):
             raise HTTPException(403, "Das Ziel liegt nicht im Scope des Projekts")
-        known = mcp.MCP_KEYS if target.kind == TargetKind.MCP else attack_lib.MODULE_KEYS
-        modules = data.modules or known
+        known = mcp.MCP_KEYS if target.kind == TargetKind.MCP else attack_lib.all_keys()
+        modules = data.modules or (
+            known if target.kind == TargetKind.MCP else attack_lib.MODULE_KEYS
+        )
         unknown = set(modules) - set(known)
         if unknown:
             raise HTTPException(422, f"Unbekannte Module: {', '.join(sorted(unknown))}")
@@ -398,6 +411,54 @@ def create_app(
         store.audit("run.cancelled", {"id": run_id})
         return {"ok": True}
 
+    # Skills ---------------------------------------------------------------
+    def _refresh_skills() -> None:
+        attack_lib.register([m for s in store.list_skills() if (m := skills.to_module(s))])
+
+    @app.get("/skills", dependencies=protected)
+    def list_skills() -> list[dict]:
+        return [skills.out(s) for s in store.list_skills()]
+
+    @app.post("/skills/import", dependencies=protected)
+    async def import_skills(data: SkillImportIn) -> dict:
+        try:
+            if data.source == "folder":
+                if not data.path:
+                    raise ValueError("Bitte einen Ordner angeben")
+                found = await asyncio.to_thread(
+                    skills.load_dir, Path(data.path), only_ai=data.only_ai
+                )
+            else:
+                found = await skills.fetch_github(data.repo, data.ref, only_ai=data.only_ai)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                502, f"Download fehlgeschlagen: {providers.describe_error(exc)}"
+            ) from exc
+        if not found:
+            raise HTTPException(422, "Keine passenden SKILL.md-Dateien gefunden")
+        store.save_skills(found)
+        _refresh_skills()
+        store.audit(
+            "skills.imported",
+            {
+                "source": data.path if data.source == "folder" else f"{data.repo}@{data.ref}",
+                "count": len(found),
+            },
+        )
+        return {
+            "imported": len(found),
+            "with_attacks": sum(1 for s in found if s.payload_count),
+            "attacks": sum(s.payload_count for s in found),
+        }
+
+    @app.delete("/skills/{name}", dependencies=protected, status_code=204)
+    def delete_skill(name: str) -> None:
+        if not store.delete_skill(name):
+            raise HTTPException(404, "Skill nicht gefunden")
+        _refresh_skills()
+
     @app.get("/attack-modules", dependencies=protected)
     def attack_modules() -> list[dict]:
         return [
@@ -410,8 +471,9 @@ def create_app(
                 "needs_accounts": m.needs_accounts,
                 "title": m.title,
                 "target": "agent",
+                "skill": m.key.startswith("skill:"),
             }
-            for m in attack_lib.LIBRARY
+            for m in attack_lib.all_modules()
         ] + [
             {
                 "key": m.key,

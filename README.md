@@ -69,6 +69,18 @@ Aufgerufen werden standardmäßig nur lesende Tools; schreibende nur, wenn es im
 
 ![MCP-Audit](docs/screenshots/mcp-audit.png)
 
+### Skills importieren
+
+Unter **Skills** lassen sich Skill-Sammlungen im SKILL.md-Format übernehmen, standardmäßig [Anthropic-Cybersecurity-Skills](https://github.com/mukul975/Anthropic-Cybersecurity-Skills) (Apache-2.0), oder ein eigener Ordner. Gelesen werden nur die SKILL.md-Dateien, Skripte nie ausgeführt.
+
+- Angriffstexte aus Codeblöcken ` ```text ` oder ` ```prompt ` werden zu einem eigenen Testmodul (Markierung „Skill“ im Testlauf). Quelle, Autor und Lizenz stehen in der Gegenmaßnahme jedes Befunds.
+- Gegenmaßnahmen und Prüflisten erscheinen im Dashboard bei Befunden derselben OWASP-Kategorie.
+- Eigene Skills können im Frontmatter `kac_detect` (`leak`, `judge`, `compliance`) und `kac_goal` setzen.
+
+In der Standardsammlung enthält derzeit nur „Testing for System Prompt Leakage“ fertige Angriffstexte (11). Die übrigen KI-Skills sind Anleitungen für garak, Promptfoo oder PyRIT und kommen als Wissen dazu.
+
+![Skills](docs/screenshots/skills.png)
+
 ## Aufbau
 
 ```

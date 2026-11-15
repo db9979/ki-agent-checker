@@ -320,8 +320,26 @@ LIBRARY: tuple[AttackModule, ...] = (
 
 MODULE_KEYS = [m.key for m in LIBRARY]
 
+# Zusätzliche Module aus importierten Skills (siehe skills.py)
+EXTRA: dict[str, AttackModule] = {}
+
+
+def register(modules: list[AttackModule]) -> None:
+    EXTRA.clear()
+    EXTRA.update({m.key: m for m in modules})
+
+
+def all_modules() -> list[AttackModule]:
+    return [*LIBRARY, *EXTRA.values()]
+
+
+def all_keys() -> list[str]:
+    return [m.key for m in all_modules()]
+
 
 def module(key: str) -> AttackModule:
+    if key in EXTRA:
+        return EXTRA[key]
     return next(m for m in LIBRARY if m.key == key)
 
 
