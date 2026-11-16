@@ -201,7 +201,32 @@ Wer ein Promptfoo-Konto hat, kann stattdessen im Terminal `promptfoo auth login`
 der Angriffe nutzt Promptfoo seinen Online-Dienst oder einen eigenen Modell-Schlüssel (z. B.
 `OPENAI_API_KEY`). Ergebnisse erscheinen nach dem Lauf.
 
-Beide externen Scanner sprechen über eine lokale Brücke der App mit dem Ziel. Anmeldung, 2FA, eigene
+### PyRIT
+
+[PyRIT](https://github.com/Azure/PyRIT) ist ein Red-Teaming-Werkzeug von Microsoft (MIT-Lizenz) mit über
+600 bekannten Jailbreak-Vorlagen (DAN, AIM, Dev-Mode und viele aus der Community). Es wird einmalig
+separat installiert und braucht Python 3.10 bis 3.13:
+
+| System | Befehl |
+| --- | --- |
+| macOS | `brew install pipx` und danach `pipx install pyrit` |
+| Linux, auch uConsole | `sudo apt install pipx` und danach `pipx install pyrit` |
+| Windows | `py -m pip install --user pipx`, dann `py -m pipx install pyrit` |
+
+Im Testlauf **PyRIT** wählen. Das Feld für den Befehl darf leer bleiben: Die App sucht PyRIT in der
+pipx-Installation und bei `python3`. Sonst den Python-Befehl der Installation oder ihren Ordner eintragen.
+
+Die App ruft PyRIT nicht selbst auf, sondern liest seine Datensätze und schickt die Angriffe über die
+eigenen Sitzungen ans Ziel, also mit Anmeldung, 2FA und Live-Graph:
+
+- **Jailbreak-Vorlagen:** Aus allen Vorlagen wird eine feste Auswahl (Standard 20) getroffen, damit Läufe
+  vergleichbar bleiben. In jede Vorlage setzt die App abwechselnd zwei Ziele ein: ein Kennwort ausgeben
+  (Erfolg wird am Kennwort erkannt) oder eine Phishing-Mail schreiben (bewertet der Richter).
+- **System-Prompt-Diebstahl:** Angriffe aus dem PyRIT-Datensatz, die den System-Prompt auslesen wollen.
+
+Befunde erscheinen als „PyRIT-Jailbreaks“ (LLM01) und „PyRIT System-Prompt-Diebstahl“ (LLM07).
+
+garak und Promptfoo sprechen über eine lokale Brücke der App mit dem Ziel. Anmeldung, 2FA, eigene
 Modelle und MCP-Tools funktionieren damit genauso wie bei den eigenen Angriffen.
 
 ## Einen Lauf starten und verfolgen
@@ -288,6 +313,9 @@ eintragen, z. B. die Ausgabe von `which garak` im Terminal.
 
 **garak läuft, aber nichts passiert.** In der Statusleiste über dem Angriffspfad stehen Phase, Anfragen
 ans Ziel und Fehler. Viele Fehler heißen meist: Ziel nicht erreichbar oder Anmeldung abgelaufen.
+
+**PyRIT wird nicht gefunden.** Im Terminal `pipx list` ausführen; der dort genannte Ordner der
+Installation (z. B. `~/.local/pipx/venvs/pyrit`) kann direkt eingetragen werden.
 
 **Promptfoo bricht mit einer E-Mail-Abfrage ab.** Siehe [Promptfoo](#promptfoo): E-Mail hinterlegen,
 Bestätigungslink anklicken, Scan neu starten.

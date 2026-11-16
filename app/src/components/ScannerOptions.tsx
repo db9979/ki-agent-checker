@@ -3,7 +3,7 @@ import { HelpLink } from "./HelpLink";
 import { useState } from "react";
 import { api } from "../lib/engine";
 
-export type ScannerTool = "garak" | "promptfoo";
+export type ScannerTool = "garak" | "promptfoo" | "pyrit";
 
 export interface ScannerSettings {
   tool: ScannerTool;
@@ -23,7 +23,14 @@ const DEFAULTS: Record<ScannerTool, Omit<ScannerSettings, "tool">> = {
     max_prompts: 20,
   },
   promptfoo: { cmd: "npx -y promptfoo@latest", probes: "owasp:llm", purpose: "", num_tests: 3, max_prompts: 20 },
+  // cmd leer: die Engine sucht PyRIT selbst (pipx, python3); probes = Datensätze
+  pyrit: { cmd: "", probes: "jailbreak,leak", purpose: "", num_tests: 3, max_prompts: 20 },
 };
+
+const PYRIT_SETS = [
+  ["jailbreak", "Jailbreak-Vorlagen"],
+  ["leak", "System-Prompt-Diebstahl"],
+] as const;
 
 const small =
   "w-full rounded-md border border-line bg-[#0b1222] px-2 py-1.5 font-mono text-[11px] outline-none focus:border-cyan";
@@ -61,13 +68,26 @@ export function ScannerOptions({
     }
   };
   const garak = value.tool === "garak";
+  const pyrit = value.tool === "pyrit";
+  const sets = new Set(value.probes.split(",").filter(Boolean));
+  const toggleSet = (key: string) => {
+    const next = new Set(sets);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    set({ probes: [...next].join(",") });
+  };
 
   return (
     <div className="space-y-2 rounded-lg border border-line bg-[#0b1222]/60 p-2 text-xs text-muted">
       <label className="block">
-        Befehl
+        {pyrit ? "Python-Befehl oder Ordner (leer = automatisch suchen)" : "Befehl"}
         <div className="mt-1 flex gap-1">
-          <input className={small} value={value.cmd} onChange={(e) => set({ cmd: e.target.value })} />
+          <input
+            className={small}
+            value={value.cmd}
+            onChange={(e) => set({ cmd: e.target.value })}
+            placeholder={pyrit ? "automatisch" : undefined}
+          />
           <button onClick={test} className="shrink-0 rounded-md bg-panel-2 px-2 text-[11px] hover:text-text">
             Prüfen
           </button>
@@ -84,7 +104,38 @@ export function ScannerOptions({
           {check.ok ? `Gefunden: ${check.version || value.tool}` : check.error}
         </p>
       )}
-      <div className={garak ? "grid grid-cols-4 gap-1" : ""}>
+      {pyrit && (
+        <div className="grid grid-cols-4 gap-1">
+          <div className="col-span-3">
+            Datensätze
+            <div className="mt-1 flex flex-wrap gap-1">
+              {PYRIT_SETS.map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => toggleSet(key)}
+                  className={`rounded-md border px-2 py-1 text-[11px] ${
+                    sets.has(key) ? "border-cyan/50 bg-cyan/10 text-cyan" : "border-line hover:text-text"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="block" title="Aus über 600 Vorlagen wird eine feste Auswahl getroffen, damit Läufe vergleichbar bleiben">
+            Vorlagen
+            <input
+              type="number"
+              min={1}
+              max={256}
+              className={`${small} mt-1`}
+              value={value.max_prompts}
+              onChange={(e) => set({ max_prompts: Math.min(256, Math.max(1, Number(e.target.value) || 1)) })}
+            />
+          </label>
+        </div>
+      )}
+      <div className={pyrit ? "hidden" : garak ? "grid grid-cols-4 gap-1" : ""}>
         <label className={garak ? "col-span-3 block" : "block"}>
           {garak ? "Probes (Komma-getrennt)" : "Plugins oder Preset (z. B. owasp:llm)"}
           <input className={`${small} mt-1`} value={value.probes} onChange={(e) => set({ probes: e.target.value })} />
@@ -103,7 +154,7 @@ export function ScannerOptions({
           </label>
         )}
       </div>
-      {!garak && (
+      {value.tool === "promptfoo" && (
         <div className="grid grid-cols-4 gap-1">
           <label className="col-span-3 block">
             Zweck des Agenten (für passende Angriffe)
@@ -129,9 +180,11 @@ export function ScannerOptions({
       )}
       <p className="text-[10px] leading-relaxed">
         <span className="float-right ml-1">
-          <HelpLink anchor={garak ? "garak" : "promptfoo"} />
+          <HelpLink anchor={value.tool} />
         </span>
-        {garak
+        {pyrit
+          ? "PyRIT (Microsoft) wird separat installiert: pipx install pyrit. Die App liest seine Jailbreak-Vorlagen und schickt sie über die eigenen Sitzungen ans Ziel, mit Anmeldung, 2FA und Live-Graph."
+          : garak
           ? "garak wird separat installiert (pipx install garak, auf dem Mac vorher brew install pipx). Es spricht über eine lokale Brücke mit dem Ziel, Anmeldung und 2FA übernimmt die App."
           : "Promptfoo braucht Node.js 18+. Zum Erzeugen der Angriffe nutzt es seinen Online-Dienst oder einen eigenen Modell-Schlüssel (z. B. OPENAI_API_KEY)."}
       </p>

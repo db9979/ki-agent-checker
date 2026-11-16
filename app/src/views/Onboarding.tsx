@@ -652,6 +652,12 @@ const GARAK_INSTALL = {
   win: ["py -m pip install --user pipx", "py -m pipx install garak"],
 };
 
+const PYRIT_INSTALL = {
+  mac: ["brew install pipx", "pipx install pyrit"],
+  linux: ["sudo apt install pipx", "pipx install pyrit"],
+  win: ["py -m pip install --user pipx", "py -m pipx install pyrit"],
+};
+
 function CopyLine({ cmd }: { cmd: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -740,6 +746,7 @@ function SourcesStep({ onNavigate }: { onNavigate: (v: Nav) => void }) {
   const { data: skills, reload: reloadSkills } = useApi<Skill[]>("/skills");
   const garak = useScannerCheck("garak");
   const pf = useScannerCheck("promptfoo");
+  const pyrit = useScannerCheck("pyrit");
   const [email, setEmail] = useState("");
   const [mail, setMail] = useState<{ ok: boolean; email?: string; error?: string } | "busy" | null>(null);
   const [skillBusy, setSkillBusy] = useState<string | null>(null);
@@ -786,13 +793,14 @@ function SourcesStep({ onNavigate }: { onNavigate: (v: Nav) => void }) {
   };
 
   const garakOk = garak.check !== null && garak.check !== "busy" && garak.check.ok;
+  const pyritOk = pyrit.check !== null && pyrit.check !== "busy" && pyrit.check.ok;
   const pfOk = pf.check !== null && pf.check !== "busy" && pf.check.ok;
   const mailOk = mail !== null && mail !== "busy" && mail.ok && !!mail.email;
 
   return (
     <>
       <Title icon={Layers} title="Testquellen einrichten">
-        Die eigenen Angriffe sind sofort einsatzbereit. garak und Promptfoo sind bekannte Open-Source-Scanner mit
+        Die eigenen Angriffe sind sofort einsatzbereit. garak, Promptfoo und PyRIT sind bekannte Open-Source-Werkzeuge mit
         hunderten weiteren Tests; sie werden einmalig separat installiert und laufen dann über die App gegen dein Ziel.
       </Title>
       <div className="grid gap-3 lg:grid-cols-2">
@@ -859,6 +867,24 @@ function SourcesStep({ onNavigate }: { onNavigate: (v: Nav) => void }) {
           </div>
           <p className="text-[11px] text-muted">Danach prüfen. Wird garak nicht gefunden, den vollen Pfad eintragen.</p>
           <CheckRow {...garak} />
+        </SourceCard>
+
+        <SourceCard
+          icon={Layers}
+          title="PyRIT"
+          badge={<Badge tone={pyritOk ? "green" : "muted"}>{pyritOk ? "gefunden" : "optional"}</Badge>}
+        >
+          <p className="text-xs leading-relaxed text-muted">
+            Red-Teaming-Werkzeug von Microsoft mit über 600 bekannten Jailbreak-Vorlagen. Die App liest die Vorlagen
+            und schickt sie selbst ans Ziel. Braucht Python 3.10 bis 3.13:
+          </p>
+          <div className="space-y-1">
+            {PYRIT_INSTALL[system].map((c) => (
+              <CopyLine key={c} cmd={c} />
+            ))}
+          </div>
+          <p className="text-[11px] text-muted">Feld leer lassen, die App sucht PyRIT selbst. Sonst Python-Befehl oder Ordner eintragen.</p>
+          <CheckRow {...pyrit} />
         </SourceCard>
 
         <SourceCard
@@ -986,6 +1012,7 @@ function RunStep({ onRunStarted, onNavigate }: { onRunStarted: () => void; onNav
     ["own", "Eigene Angriffe", `${active.length} Module, Ergebnisse live`],
     ["garak", "garak", "Probes von NVIDIA, live im Angriffspfad"],
     ["promptfoo", "Promptfoo", "Angriffe passend zum Zweck, Ergebnis am Ende"],
+    ["pyrit", "PyRIT", "Bekannte Jailbreak-Vorlagen, live im Angriffspfad"],
   ];
 
   return (
@@ -994,7 +1021,7 @@ function RunStep({ onRunStarted, onNavigate }: { onRunStarted: () => void; onNav
         Alles bereit. Der Lauf startet gegen <span className="text-text">{target.name}</span>; die App springt in den
         Live-Angriff, wo du jeden Angriff als Pfad durch die Schutzschichten verfolgst.
       </Title>
-      <div className="mb-4 grid max-w-3xl gap-2 sm:grid-cols-3">
+      <div className="mb-4 grid max-w-3xl gap-2 sm:grid-cols-4">
         {sources
           .filter(([k]) => !isMcp || k === "own")
           .map(([k, label, hint]) => (

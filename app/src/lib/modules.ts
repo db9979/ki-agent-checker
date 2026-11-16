@@ -12,6 +12,8 @@ export const MODULES = [
   { key: "resource_exhaustion", label: "Ressourcenverbrauch", owasp: "LLM10" },
   { key: "hallucination", label: "Erfundene Fakten", owasp: "LLM09" },
   { key: "multi_turn", label: "Mehrstufig", owasp: "LLM01" },
+  { key: "pyrit:jailbreak", label: "PyRIT-Jailbreaks", owasp: "LLM01" },
+  { key: "pyrit:leak", label: "PyRIT System-Prompt-Diebstahl", owasp: "LLM07" },
   { key: "mcp_auth", label: "Zugangsschutz", owasp: "LLM06" },
   { key: "mcp_poisoning", label: "Tool-Poisoning", owasp: "LLM01" },
   { key: "mcp_agency", label: "Riskante Tools", owasp: "LLM06" },
