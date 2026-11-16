@@ -13,7 +13,8 @@ from typing import Any
 
 from .targets import Target, TargetKind
 
-INJECTION = ["prompt_injection", "jailbreak", "multi_turn"]
+INJECTION = ["prompt_injection", "indirect_injection", "multilingual", "jailbreak", "multi_turn"]
+OUTPUT = ["insecure_output", "hallucination", "resource_exhaustion"]
 SCANNER_PREFIXES = ["skill:", "garak:", "promptfoo:"]
 OUTBOUND = ("sendet Nachrichten nach außen", "ruft beliebige Adressen ab")
 
@@ -174,6 +175,18 @@ def agent_graph(target: Target, label: str | None = None) -> dict:
         edges.append(
             _edge("agent", "actions", ["excessive_agency", "multi_turn"], label="ohne Bestätigung")
         )
+    nodes.append(
+        _node(
+            "ui",
+            "Ausgabe",
+            "Chat-Fenster, Browser, Kosten",
+            "data",
+            2,
+            "MonitorSmartphone",
+            group="data",
+        )
+    )
+    edges.append(_edge("agent", "ui", OUTPUT, label="Ausgabe"))
     if sum(1 for a in target.accounts if a.identifier and a.marker) >= 2:
         nodes.append(
             _node(
