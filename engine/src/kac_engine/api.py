@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, custom, detect, mcp, providers, report, scanners, skills
+from . import __version__, custom, detect, mcp, oauth, providers, report, scanners, skills
 from . import attacks as attack_lib
 from . import compare as compare_lib
 from . import graph as graph_lib
@@ -41,6 +41,7 @@ from .targets import (
     SECRET_FIELDS,
     Account,
     Target,
+    TargetError,
     TargetIn,
     TargetKind,
     in_scope,
@@ -115,6 +116,19 @@ class DetectIn(BaseModel):
 
 class CustomImportIn(BaseModel):
     yaml: str = Field(max_length=500_000)
+
+
+def _oauth_page(ok: bool, text: str) -> str:
+    import html
+
+    color = "#34d399" if ok else "#f43f5e"
+    return (
+        "<!doctype html><meta charset=utf-8><title>KI-Agent-Checker</title>"
+        "<body style='background:#070b14;color:#e6ecff;font-family:system-ui;display:grid;"
+        "place-items:center;height:100vh;margin:0'><div style='text-align:center'>"
+        f"<div style='font-size:42px;color:{color}'>{'✓' if ok else '✕'}</div>"
+        f"<p>{html.escape(text)}</p></div></body>"
+    )
 
 
 class DemoRunIn(BaseModel):
@@ -237,6 +251,9 @@ def create_app(
         if data.kind == TargetKind.MODEL:
             if not data.provider_id or not store.get_provider(data.provider_id):
                 raise HTTPException(422, "Bitte ein angebundenes Modell auswählen")
+        elif data.kind in (TargetKind.MCP, TargetKind.MCP_TOOL) and data.mcp_command:
+            # Lokaler MCP-Server (stdio): läuft auf diesem Rechner, keine Adresse im Scope nötig
+            data.url = None
         else:
             if not data.url:
                 raise HTTPException(422, "Adresse des Ziels fehlt")
@@ -340,7 +357,52 @@ def create_app(
         for a in target.accounts:
             for field in SECRET_FIELDS:
                 keys.delete(secret_key(target_id, a.name, field))
+            for field in ("refresh_token", "oauth"):
+                keys.delete(secret_key(target_id, a.name, field))
         store.audit("target.deleted", {"id": target_id})
+
+    # OAuth ------------------------------------------------------------------
+    @app.post("/targets/{target_id}/oauth/start", dependencies=protected)
+    async def oauth_start(target_id: str, request: Request) -> dict:
+        target = store.get_target(target_id)
+        if not target:
+            raise HTTPException(404, "Ziel nicht gefunden")
+        redirect = str(request.base_url).rstrip("/") + "/oauth/callback"
+        try:
+            url = await oauth.start(target, keys, redirect)
+        except TargetError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        except (httpx.HTTPError, KeyError, ValueError) as exc:
+            raise HTTPException(502, f"OAuth-Start fehlgeschlagen: {exc}") from exc
+        store.audit("oauth.started", {"target": target_id})
+        return {"url": url}
+
+    @app.get("/targets/{target_id}/oauth/status", dependencies=protected)
+    def oauth_status(target_id: str) -> dict:
+        target = store.get_target(target_id)
+        if not target:
+            raise HTTPException(404, "Ziel nicht gefunden")
+        return oauth.status(target, keys)
+
+    @app.get("/oauth/callback", response_class=HTMLResponse)
+    async def oauth_callback(state: str = "", code: str = "", error: str = "") -> HTMLResponse:
+        """Ohne Engine-Token, weil der Browser hierher zurückkehrt; geschützt durch ``state``."""
+        target_id = oauth.target_for_state(state)
+        target = store.get_target(target_id) if target_id else None
+        if error or not code or not target:
+            oauth.pending.pop(state, None)
+            text = f"Anmeldung abgebrochen: {error or 'unbekannte oder abgelaufene Anfrage'}"
+            return HTMLResponse(_oauth_page(False, text), status_code=400)
+        try:
+            await oauth.finish(target, keys, state, code)
+        except (TargetError, httpx.HTTPError, KeyError, ValueError) as exc:
+            return HTMLResponse(_oauth_page(False, str(exc)), status_code=400)
+        store.audit("oauth.signed_in", {"target": target.id})
+        return HTMLResponse(
+            _oauth_page(
+                True, f"Angemeldet für „{target.name}“. Du kannst dieses Fenster schließen."
+            )
+        )
 
     @app.post("/targets/{target_id}/check", dependencies=protected)
     async def check_target(target_id: str, data: CheckIn | None = None) -> ConnectionResult:
@@ -350,6 +412,10 @@ def create_app(
             raise HTTPException(404, "Ziel nicht gefunden")
         provider = store.get_provider(target.provider_id) if target.provider_id else None
         codes = data.mfa_codes if data else {}
+        try:
+            await oauth.refresh_if_needed(target, keys)
+        except TargetError as exc:
+            return ConnectionResult(ok=False, error=str(exc))
         if target.kind == TargetKind.MCP:
             start = time.perf_counter()
             try:
@@ -445,6 +511,10 @@ def create_app(
             raise HTTPException(422, "Projekt des Ziels fehlt")
         if target.url and not in_scope(target.url, project.scope):
             raise HTTPException(403, "Das Ziel liegt nicht im Scope des Projekts")
+        try:
+            await oauth.refresh_if_needed(target, keys)
+        except TargetError as exc:
+            raise HTTPException(422, str(exc)) from exc
         if data.scanner:
             return _start_scanner(data, target, project.id, str(request.base_url).rstrip("/"))
         known = mcp.MCP_KEYS if target.kind == TargetKind.MCP else attack_lib.all_keys()

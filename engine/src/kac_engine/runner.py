@@ -18,7 +18,7 @@ from .events import EventHub
 from .honeypot import ModelAgent, dangerous, new_canary
 from .judge import REFUSAL, Context, Verdict, ask_judge, detect, heuristic
 from .keystore import SecretStore
-from .mcp import McpToolSession
+from .mcp import tool_session_class
 from .models import Finding, Provider
 from .providers import describe_error
 from .store import Store
@@ -105,7 +105,7 @@ class Conversations:
         session = self.sessions.get(account_idx)
         if session is None:
             account = t.accounts[account_idx] if account_idx >= 0 else None
-            cls = McpToolSession if t.kind == TargetKind.MCP_TOOL else HttpSession
+            cls = tool_session_class(t) if t.kind == TargetKind.MCP_TOOL else HttpSession
             session = cls(t, account, self._secrets(account))
             self.sessions[account_idx] = session
         return await session.send(history), []

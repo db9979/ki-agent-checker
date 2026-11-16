@@ -62,7 +62,7 @@ export interface EngineEvent {
 }
 
 export type TargetKind = "model" | "openai_endpoint" | "http" | "mcp" | "mcp_tool";
-export type AuthKind = "none" | "bearer" | "header" | "basic" | "login";
+export type AuthKind = "none" | "bearer" | "header" | "basic" | "login" | "oauth";
 
 export interface AuthConfig {
   kind: AuthKind;
@@ -77,6 +77,8 @@ export interface AuthConfig {
   mfa_url: string | null;
   mfa_body: string;
   mfa_challenge_path: string | null;
+  oauth_client_id?: string | null;
+  oauth_scope?: string | null;
 }
 
 export interface Account {
@@ -108,6 +110,7 @@ export interface Target {
   mcp_tool_calls?: "none" | "readonly" | "all";
   mcp_tool?: string | null;
   mcp_arg?: string | null;
+  mcp_command?: string | null;
   accounts: Account[];
   leak_markers: string[];
   delay: number;

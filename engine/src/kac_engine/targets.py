@@ -54,6 +54,7 @@ class AuthKind(StrEnum):
     HEADER = "header"  # Token des Kontos in einem eigenen Header
     BASIC = "basic"  # Benutzername und Passwort
     LOGIN = "login"  # Login-Aufruf, Token oder Cookie aus der Antwort
+    OAUTH = "oauth"  # OAuth 2.1 mit PKCE (MCP-Autorisierung), Token kommt aus dem Browser-Login
 
 
 class AuthConfig(BaseModel):
@@ -81,6 +82,9 @@ class AuthConfig(BaseModel):
     mfa_challenge_path: str | None = Field(
         default=None, description="Pfad zur Challenge-ID in der Antwort des ersten Schritts"
     )
+    # OAuth: leer = automatisch (Dynamic Client Registration, Scopes aus den Metadaten)
+    oauth_client_id: str | None = None
+    oauth_scope: str | None = None
 
 
 class AccountIn(BaseModel):
@@ -140,6 +144,10 @@ class TargetIn(BaseModel):
         default="readonly",
         description="Welche Tools eines MCP-Servers beim Audit aufgerufen werden dürfen",
     )
+    mcp_command: str | None = Field(
+        default=None,
+        description="Lokaler MCP-Server über stdio, z. B. „npx -y @modelcontextprotocol/server-filesystem .“",
+    )
 
 
 class Target(BaseModel):
@@ -163,10 +171,11 @@ class Target(BaseModel):
     mcp_tool_calls: Literal["none", "readonly", "all"] = "readonly"
     mcp_tool: str | None = None
     mcp_arg: str | None = None
+    mcp_command: str | None = None
     created_at: datetime
 
     def describe(self) -> str:
-        where = self.url or "eigenes Modell"
+        where = self.url or (f"stdio: {self.mcp_command}" if self.mcp_command else "eigenes Modell")
         return f"{self.name} ({where})"
 
 
@@ -321,6 +330,12 @@ class HttpSession:
             if not token:
                 raise TargetError("Für dieses Konto ist kein Token hinterlegt")
             self.headers[auth.header_name] = token
+        elif auth.kind == AuthKind.OAUTH:
+            if not token:
+                raise TargetError(
+                    "Noch nicht angemeldet: im Ziel „Mit OAuth anmelden“ klicken und im Browser bestätigen"
+                )
+            self.headers["Authorization"] = f"Bearer {token}"
         elif auth.kind == AuthKind.BASIC:
             raw = f"{username or ''}:{password or ''}".encode()
             self.headers["Authorization"] = "Basic " + base64.b64encode(raw).decode()

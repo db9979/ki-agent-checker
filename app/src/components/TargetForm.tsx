@@ -1,5 +1,6 @@
 import { CheckCircle2, KeyRound, Loader2, Plus, Trash2, UserRound, Wand2, XCircle } from "lucide-react";
 import { HelpLink } from "./HelpLink";
+import { OAuthButton } from "./OAuthButton";
 import { useState } from "react";
 import { api } from "../lib/engine";
 import type { AuthKind, Project, Provider, Target, TargetKind } from "../lib/types";
@@ -44,6 +45,7 @@ const AUTHS: { kind: AuthKind; label: string }[] = [
   { kind: "header", label: "Eigener Header" },
   { kind: "basic", label: "Benutzername + Passwort (Basic)" },
   { kind: "login", label: "Login-Aufruf (Token oder Cookie)" },
+  { kind: "oauth", label: "OAuth (Anmeldung im Browser, z. B. MCP-Server)" },
 ];
 
 interface AccountDraft {
@@ -84,6 +86,7 @@ interface DetectResult {
   reply?: string;
   server?: string;
   needs_auth?: boolean;
+  oauth?: boolean;
   note?: string;
   error?: string;
 }
@@ -137,6 +140,10 @@ export function TargetForm({
     })),
   );
   const [mcpTool, setMcpTool] = useState(initial?.mcp_tool ?? "");
+  const [stdio, setStdio] = useState(!!initial?.mcp_command);
+  const [mcpCommand, setMcpCommand] = useState(initial?.mcp_command ?? "");
+  const [oauthClient, setOauthClient] = useState(initial?.auth.oauth_client_id ?? "");
+  const [oauthScope, setOauthScope] = useState(initial?.auth.oauth_scope ?? "");
   const [mcpArg, setMcpArg] = useState(initial?.mcp_arg ?? "");
   const [toolPolicy, setToolPolicy] = useState<ToolPolicy>(initial?.mcp_tool_calls ?? "readonly");
   const [leakMarkers, setLeakMarkers] = useState((initial?.leak_markers ?? []).join("\n"));
@@ -171,7 +178,7 @@ export function TargetForm({
         setAuthKind("bearer");
         setAccounts([{ ...(accounts[0] ?? emptyAccount(0)), token: detectToken }, ...accounts.slice(1)]);
       } else if (r.needs_auth) {
-        setAuthKind("bearer");
+        setAuthKind(r.oauth ? "oauth" : "bearer");
       }
     } catch (e) {
       setDetected({ ok: false, url: detectUrl, error: String((e as Error).message) });
@@ -195,7 +202,8 @@ export function TargetForm({
           provider_id: kind === "model" ? providerId || providers?.[0]?.id : null,
           system_prompt: systemPrompt,
           honeypot_tools: honeypot,
-          url: kind === "model" ? null : url,
+          url: kind === "model" || (isMcp && stdio) ? null : url,
+          mcp_command: isMcp && stdio ? orNull(mcpCommand) : null,
           model: orNull(model),
           method,
           delay: initial?.delay ?? 0.5,
@@ -218,6 +226,8 @@ export function TargetForm({
             mfa_url: mfa === "none" ? null : orNull(mfaUrl),
             mfa_body: mfaBody,
             mfa_challenge_path: orNull(mfaChallenge),
+            oauth_client_id: orNull(oauthClient),
+            oauth_scope: orNull(oauthScope),
           },
           accounts: list.map((a) => ({
             name: a.name,
@@ -349,15 +359,51 @@ export function TargetForm({
         </>
       ) : (
         <>
-          <label className="block text-xs text-muted">
-            Adresse (muss im Scope liegen)
-            <input
-              className={`${input} font-mono`}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder={isMcp ? "https://server.de/mcp" : undefined}
-            />
-          </label>
+          {isMcp && (
+            <div className="grid grid-cols-2 gap-1.5">
+              {(
+                [
+                  [false, "Über das Netz (HTTP)"],
+                  [true, "Lokal starten (stdio)"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={label}
+                  onClick={() => setStdio(value)}
+                  className={`rounded-lg border px-2 py-1 text-[11px] ${
+                    stdio === value ? "border-cyan bg-cyan/10 text-cyan" : "border-line text-muted hover:text-text"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {isMcp && stdio ? (
+            <label className="block text-xs text-muted">
+              Befehl, der den MCP-Server startet (läuft auf diesem Rechner)
+              <input
+                className={`${input} font-mono`}
+                value={mcpCommand}
+                onChange={(e) => setMcpCommand(e.target.value)}
+                placeholder="npx -y @modelcontextprotocol/server-filesystem ./testordner"
+              />
+              <span className="mt-1 block text-[10px] text-amber">
+                Nur Server starten, denen du vertraust: der Befehl läuft mit deinen Rechten. Für Schreib-Tools am besten
+                einen Testordner verwenden.
+              </span>
+            </label>
+          ) : (
+            <label className="block text-xs text-muted">
+              Adresse (muss im Scope liegen)
+              <input
+                className={`${input} font-mono`}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder={isMcp ? "https://server.de/mcp" : undefined}
+              />
+            </label>
+          )}
           {isMcp && (
             <div className="grid grid-cols-2 gap-1.5">
               {(
@@ -474,6 +520,29 @@ export function TargetForm({
                 </option>
               ))}
             </select>
+            {authKind === "oauth" && (
+              <div className="mt-2 space-y-2">
+                <p className="text-[11px] text-muted">
+                  Die App findet den Anmeldeserver selbst (MCP-Autorisierung) und meldet sich im Browser an. Tokens landen im
+                  Schlüsselbund und werden vor jedem Lauf erneuert.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block text-xs text-muted">
+                    Client-ID (leer = automatisch registrieren)
+                    <input className={`${input} font-mono`} value={oauthClient} onChange={(e) => setOauthClient(e.target.value)} />
+                  </label>
+                  <label className="block text-xs text-muted">
+                    Scopes (leer = vom Server)
+                    <input className={`${input} font-mono`} value={oauthScope} onChange={(e) => setOauthScope(e.target.value)} />
+                  </label>
+                </div>
+                {initial ? (
+                  <OAuthButton targetId={initial.id} />
+                ) : (
+                  <p className="text-[11px] text-amber">Erst speichern, dann beim Ziel „Mit OAuth anmelden“ klicken.</p>
+                )}
+              </div>
+            )}
             {authKind === "header" && (
               <label className="mt-2 block text-xs text-muted">
                 Header-Name

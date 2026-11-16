@@ -291,3 +291,28 @@ def test_no_false_positives_from_real_server():
     tpl = next(p for p in mcp.PAYLOADS if p.technique == "Vorlagen-Injection")
     assert not re.search(tpl.signs, "Das Ergebnis für alle drei Ausdrücke ist 4011.")
     assert re.search(tpl.signs, "kac4011kac kac${1337*3}kac")
+
+
+async def test_stdio_server(api_client):
+    import sys
+    from pathlib import Path
+
+    fake = Path(__file__).parent / "fakes" / "fake_mcp_stdio.py"
+    cmd = f'"{sys.executable}" "{fake}"'
+    resp = make_target(api_client, url=None, mcp_command=cmd, auth={"kind": "none"}, accounts=[])
+    assert resp.status_code == 201, resp.text
+    target = resp.json()
+    check = api_client.post(f"/targets/{target['id']}/check").json()
+    assert check["ok"] and "Notizen-lokal" in check["reply"], check
+    run, events = await _run(api_client, target["id"])
+    assert run.status == "finished", events[-2:]
+    found = {f.module for f in run.findings}
+    assert {"mcp_poisoning", "mcp_injection"} <= found and "mcp_auth" not in found
+
+
+async def test_stdio_missing_command(api_client):
+    target = make_target(
+        api_client, url=None, mcp_command="gibt-es-nicht-kac", auth={"kind": "none"}, accounts=[]
+    ).json()
+    check = api_client.post(f"/targets/{target['id']}/check").json()
+    assert not check["ok"] and "nicht gefunden" in check["error"]
