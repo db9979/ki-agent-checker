@@ -1814,6 +1814,7 @@ version = "0.2.1"
 dependencies = [
  "log",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-process",
