@@ -63,14 +63,23 @@ jobs:
       - name: Desktop-App bauen
         working-directory: app
         shell: bash
+        env:
+          # Signiert die Update-Pakete für das Auto-Update (Secrets im Repo)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           npm ci
+          ARGS=(--config src-tauri/tauri.release.conf.json)
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            ARGS+=(--config '{"bundle":{"createUpdaterArtifacts":true}}')
+          else
+            echo "::warning::Kein TAURI_SIGNING_PRIVATE_KEY: Build ohne Auto-Update-Pakete"
+          fi
           if [ "$RUNNER_OS" = "Linux" ]; then
             # .deb für Raspberry Pi OS/Debian, AppImage für andere Distributionen
-            npx tauri build --config src-tauri/tauri.release.conf.json --bundles deb,appimage
-          else
-            npx tauri build --config src-tauri/tauri.release.conf.json
+            ARGS+=(--bundles deb,appimage)
           fi
+          npx tauri build "${ARGS[@]}"
 
       # Startet die Engine aus dem fertigen Paket. Fängt z. B. Signaturprobleme ab,
       # bei denen macOS das eingebettete Python nicht laden lässt.
@@ -98,6 +107,8 @@ jobs:
             app/src-tauri/target/release/bundle/**/*.dmg
             app/src-tauri/target/release/bundle/**/*.AppImage
             app/src-tauri/target/release/bundle/**/*.deb
+            app/src-tauri/target/release/bundle/**/*.app.tar.gz
+            app/src-tauri/target/release/bundle/**/*.sig
           if-no-files-found: warn
 
   # Bei einem Tag v* (z. B. v0.1.0) oder manuell mit „release“ landen alle Installer
@@ -125,11 +136,17 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # latest.json für das Auto-Update: je Plattform Download-Adresse und Signatur
+      - name: Update-Manifest erzeugen
+        run: |
+          python3 scripts/update_manifest.py dist "$TAG" "${{ github.repository }}" > latest.json
+          if [ -s latest.json ]; then mv latest.json dist/ && cat dist/latest.json; else echo "Keine Signaturen, kein Auto-Update in diesem Release"; fi
+
       - name: Release anlegen
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          find dist -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) > files.txt
+          find dist -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.app.tar.gz' -o -name 'latest.json' \) > files.txt
           cat files.txt
           cat > notes.md <<'NOTES'
           ## Download

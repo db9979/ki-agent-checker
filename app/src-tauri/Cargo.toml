@@ -1,6 +1,6 @@
 [package]
 name = "ki-agent-checker"
-version = "0.2.0"
+version = "0.2.1"
 description = "KI-Agent-Checker: Sicherheitstests für KI-Agenten"
 edition = "2021"
 rust-version = "1.77"
@@ -18,3 +18,5 @@ tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
