@@ -22,8 +22,11 @@ jobs:
           # Gebaut auf Ubuntu 22.04 (glibc 2.35), damit es auf bookworm (glibc 2.36) läuft.
           - name: Linux (ARM64, uConsole)
             os: ubuntu-22.04-arm
-          - name: Windows
+          - name: Windows (x64)
             os: windows-latest
+          # Windows auf ARM, z. B. Snapdragon-Notebooks. Läuft nativ statt in der x64-Emulation.
+          - name: Windows (ARM64)
+            os: windows-11-arm
           - name: macOS (Apple Silicon)
             os: macos-latest
     runs-on: ${{ matrix.os }}
