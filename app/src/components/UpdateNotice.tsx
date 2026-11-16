@@ -1,7 +1,9 @@
+import type { Update } from "@tauri-apps/plugin-updater";
 import { CheckCircle2, Download, Loader2, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../lib/engine";
 import { openLink } from "../lib/open";
+import { findSelfUpdate, installUpdate } from "../lib/selfUpdate";
 
 export interface UpdateInfo {
   current: string;
@@ -22,15 +24,36 @@ export const updatesEnabled = () => localStorage.getItem(OFF) !== "1";
 export function UpdateNotice({ online }: { online: boolean }) {
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [skipped, setSkipped] = useState(localStorage.getItem(SKIP));
+  const [self, setSelf] = useState<Update | null>(null);
+  const [progress, setProgress] = useState<number | null | "error">();
 
   useEffect(() => {
     if (!online || !updatesEnabled()) return;
     api<UpdateInfo>("/update")
-      .then(setInfo)
+      .then(async (i) => {
+        setInfo(i);
+        if (i.newer) setSelf(await findSelfUpdate());
+      })
       .catch(() => undefined);
   }, [online]);
 
   if (!info?.newer || !info.latest || skipped === info.latest) return null;
+  const busy = progress !== undefined && progress !== "error";
+  const primary = () => {
+    if (!self || progress === "error") return openLink(info.download || info.url || "");
+    if (busy) return;
+    setProgress(null);
+    installUpdate(self, setProgress).catch(() => setProgress("error"));
+  };
+  const label = !self
+    ? `Version ${info.latest} verfügbar`
+    : progress === "error"
+      ? "Update fehlgeschlagen"
+      : busy
+        ? progress === null
+          ? "Wird installiert …"
+          : `Lädt … ${Math.round(progress * 100)} %`
+        : `Version ${info.latest} verfügbar`;
   const later = () => {
     localStorage.setItem(SKIP, info.latest!);
     setSkipped(info.latest);
@@ -39,16 +62,25 @@ export function UpdateNotice({ online }: { online: boolean }) {
   return (
     <div className="mb-3 rounded-lg border border-cyan/40 bg-cyan/10 p-2 text-xs">
       <button
-        onClick={() => openLink(info.download || info.url || "")}
-        title={`Version ${info.latest} herunterladen${info.file ? ` (${info.file})` : ""}`}
+        onClick={primary}
+        title={
+          self
+            ? `Auf Version ${info.latest} aktualisieren (App startet neu)`
+            : `Version ${info.latest} herunterladen${info.file ? ` (${info.file})` : ""}`
+        }
         className="flex w-full items-center justify-center gap-2 text-cyan min-[1400px]:justify-start"
       >
-        <Download size={15} className="shrink-0" />
-        <span className="hidden font-medium min-[1400px]:inline">Version {info.latest} verfügbar</span>
+        {busy ? <Loader2 size={15} className="shrink-0 animate-spin" /> : <Download size={15} className="shrink-0" />}
+        <span className="hidden font-medium min-[1400px]:inline">{label}</span>
       </button>
-      <div className="mt-1.5 hidden gap-2 text-[11px] min-[1400px]:flex">
-        <button onClick={() => openLink(info.download || info.url || "")} className="text-cyan hover:underline">
-          Herunterladen
+      {busy && typeof progress === "number" && (
+        <div className="mt-1.5 h-1 overflow-hidden rounded bg-panel-2">
+          <div className="h-full bg-cyan transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+        </div>
+      )}
+      <div className={`mt-1.5 hidden gap-2 text-[11px] ${busy ? "" : "min-[1400px]:flex"}`}>
+        <button onClick={primary} className="text-cyan hover:underline">
+          {self && progress !== "error" ? "Jetzt aktualisieren" : "Herunterladen"}
         </button>
         {info.url && (
           <button onClick={() => openLink(info.url!)} className="text-muted hover:text-text">

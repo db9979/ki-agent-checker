@@ -26,6 +26,15 @@ fn engine_log(engine: State<'_, Engine>) -> Vec<String> {
     engine.log.lock().map(|l| l.clone()).unwrap_or_default()
 }
 
+/// Beendet die Engine vor der Installation eines Updates, damit der Installer
+/// (vor allem unter Windows) ihre Datei ersetzen kann.
+#[tauri::command]
+fn stop_engine(engine: State<'_, Engine>) {
+    if let Some(child) = engine.child.lock().ok().and_then(|mut c| c.take()) {
+        let _ = child.kill();
+    }
+}
+
 #[tauri::command]
 fn engine_info(engine: State<'_, Engine>) -> Result<EngineInfo, String> {
     engine
@@ -127,8 +136,10 @@ fn fit_small_screens(app: &tauri::App) {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(Engine::default())
-        .invoke_handler(tauri::generate_handler![engine_info, engine_log])
+        .invoke_handler(tauri::generate_handler![engine_info, engine_log, stop_engine])
         .setup(|app| {
             let engine = app.state::<Engine>();
             let (info, child) = start_engine(app.handle(), engine.log.clone())?;

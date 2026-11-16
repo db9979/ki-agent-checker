@@ -301,14 +301,18 @@ für schwache Geräte wie den uConsole herunter. Unter 1400 px Breite zeigt die 
 ## Updates
 
 Beim Start fragt die App bei GitHub nach, ob es eine neuere Version gibt. Wenn ja, erscheint unten in der
-Seitenleiste **Version … verfügbar**. Ein Klick lädt den passenden Installer für dein System herunter
-(Windows x64/ARM64, macOS Apple Silicon, Linux .deb oder AppImage). Installieren und die App neu starten;
-Projekte, Ziele und Befunde bleiben erhalten. **Was ist neu** öffnet die Release-Notizen, das **×**
-blendet den Hinweis für diese Version aus.
+Seitenleiste **Version … verfügbar**.
 
-Oben in der Hilfe lässt sich jederzeit **Nach Updates suchen** und die automatische Prüfung beim Start
-abschalten. Dabei wird nur die Versionsnummer bei GitHub abgefragt, es werden keine Daten über Ziele oder
-Befunde gesendet.
+- **Jetzt aktualisieren:** Die App lädt das signierte Update, installiert es und startet neu. Das geht unter
+  Windows, macOS und Linux (AppImage und .deb). Projekte, Ziele und Befunde bleiben erhalten. Unter Linux
+  mit .deb kann nach einer Passwortabfrage gefragt werden.
+- **Herunterladen:** Wenn sich die App nicht selbst aktualisieren kann (z. B. beim Umstieg von 0.2.0, die
+  den Updater noch nicht hatte), lädt der Hinweis den passenden Installer herunter.
+
+**Was ist neu** öffnet die Release-Notizen, das **×** blendet den Hinweis für diese Version aus. Oben in der
+Hilfe lässt sich jederzeit **Nach Updates suchen** und die automatische Prüfung beim Start abschalten.
+Dabei wird nur die Versionsnummer bei GitHub abgefragt, es werden keine Daten über Ziele oder Befunde
+gesendet. Updates werden nur installiert, wenn ihre Signatur zum Schlüssel in der App passt.
 
 ## Häufige Probleme
 
