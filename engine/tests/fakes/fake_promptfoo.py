@@ -1,6 +1,7 @@
 """Ahmt „promptfoo redteam generate“ und „promptfoo eval“ nach."""
 
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -10,6 +11,13 @@ import yaml
 args = sys.argv[1:]
 if args == ["--version"]:
     print("0.118.0")
+    sys.exit(0)
+if args[:1] == ["config"]:
+    store = Path(os.environ["KAC_FAKE_PF_HOME"]) / "email"
+    if args[1] == "set":
+        store.write_text(args[3])
+    else:
+        print(store.read_text() if store.exists() else "No value set for email")
     sys.exit(0)
 if args[:2] == ["redteam", "generate"]:
     cfg = yaml.safe_load(Path(args[args.index("-c") + 1]).read_text())
