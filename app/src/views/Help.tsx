@@ -6,6 +6,7 @@ import doc from "../../../docs/ANLEITUNG.md?raw";
 import { clearHelpAnchor, peekHelpAnchor } from "../lib/help";
 import { openOnboarding } from "../lib/onboarding";
 import { openLink } from "../lib/open";
+import { UpdateSettings } from "../components/UpdateNotice";
 
 const REPO_DOC = "https://github.com/db9979/ki-agent-checker/blob/main/docs/ANLEITUNG.md";
 
@@ -103,6 +104,9 @@ export function Help({ onStartDemo }: { onStartDemo: () => void }) {
         <div>
           <h1 className="text-2xl font-semibold">Hilfe</h1>
           <p className="text-sm text-muted">Anleitung zum Einrichten, Testen und Auswerten</p>
+          <div className="mt-1">
+            <UpdateSettings />
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button

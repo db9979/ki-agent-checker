@@ -298,6 +298,18 @@ Ein Beispiel liegt unter `docs/beispiele/kac.yaml`. Als GitHub Action:
 Unten in der Seitenleiste schaltet **Effekte: voll / Leistungsmodus** Animationen und Leuchteffekte
 für schwache Geräte wie den uConsole herunter. Unter 1400 px Breite zeigt die Seitenleiste nur Symbole.
 
+## Updates
+
+Beim Start fragt die App bei GitHub nach, ob es eine neuere Version gibt. Wenn ja, erscheint unten in der
+Seitenleiste **Version … verfügbar**. Ein Klick lädt den passenden Installer für dein System herunter
+(Windows x64/ARM64, macOS Apple Silicon, Linux .deb oder AppImage). Installieren und die App neu starten;
+Projekte, Ziele und Befunde bleiben erhalten. **Was ist neu** öffnet die Release-Notizen, das **×**
+blendet den Hinweis für diese Version aus.
+
+Oben in der Hilfe lässt sich jederzeit **Nach Updates suchen** und die automatische Prüfung beim Start
+abschalten. Dabei wird nur die Versionsnummer bei GitHub abgefragt, es werden keine Daten über Ziele oder
+Befunde gesendet.
+
 ## Häufige Probleme
 
 **„Engine nicht erreichbar“ unten links.** Die App startet ihre Engine beim Start selbst. Hilft ein

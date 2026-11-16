@@ -24,6 +24,7 @@ import { Help } from "./views/Help";
 import { LiveAttack } from "./views/LiveAttack";
 import { Models } from "./views/Models";
 import { Onboarding, OnboardingResume } from "./views/Onboarding";
+import { UpdateNotice } from "./components/UpdateNotice";
 import { Projects } from "./views/Projects";
 import { Skills } from "./views/Skills";
 
@@ -101,6 +102,8 @@ export default function App() {
             </button>
           ))}
         </div>
+        <div className="mt-auto" />
+        <UpdateNotice online={run.online} />
         <button
           onClick={() => setEffectsMode(effects === "voll" ? "sparsam" : "voll")}
           title={
@@ -108,7 +111,7 @@ export default function App() {
               ? "Effekte: voll (klicken für Leistungsmodus)"
               : "Leistungsmodus aktiv (klicken für volle Effekte)"
           }
-          className="mb-3 mt-auto flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-muted transition hover:bg-panel-2 hover:text-text min-[1400px]:justify-start"
+          className="mb-3 flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-muted transition hover:bg-panel-2 hover:text-text min-[1400px]:justify-start"
         >
           {effects === "voll" ? (
             <Sparkles size={15} className="shrink-0 text-violet" />
