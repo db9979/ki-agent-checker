@@ -55,6 +55,18 @@ export function pathOf(a: Attack): PathInfo {
       if (tool) return { state: "breach", layer: EXTERNAL_TOOLS.has(tool.name) ? 4 : 3, reason: `nach ${n} Nachrichten ${tool.name} ausgelöst` };
       return { state: "breach", layer: 2, reason: `nach ${n} Nachrichten umgestimmt` };
     }
+    case "indirect_injection":
+      return tool
+        ? { state: "breach", layer: EXTERNAL_TOOLS.has(tool.name) ? 4 : 3, reason: `Daten lösen ${tool.name} aus` }
+        : { state: "breach", layer: 2, reason: "Anweisung aus Dokument oder Daten befolgt" };
+    case "multilingual":
+      return { state: "breach", layer: 2, reason: "Regeln greifen in anderer Sprache nicht" };
+    case "insecure_output":
+      return { state: "breach", layer: 4, reason: "ausführbarer Code landet beim Nutzer" };
+    case "resource_exhaustion":
+      return { state: "breach", layer: 2, reason: "unbegrenzte Antwort, Kosten steigen" };
+    case "hallucination":
+      return { state: "breach", layer: 2, reason: "Agent erfindet Fakten" };
     case "mcp_auth":
       return { state: "breach", layer: 3, reason: "Tools ohne gültige Anmeldung erreichbar" };
     case "mcp_poisoning":

@@ -99,11 +99,16 @@ Sofort verfügbar, ohne Installation. Für Chat-Ziele:
 | Modul | Prüft |
 | --- | --- |
 | Prompt Injection | Ob sich die Anweisungen des Systems überschreiben lassen |
+| Indirekte Injection | Anweisungen, die in E-Mails, Webseiten, API-Antworten, Tickets oder unsichtbaren Unicode-Zeichen stecken |
+| Sprachen & Verschleierung | Dieselben Anweisungen auf Französisch, Spanisch, Russisch, Chinesisch, im Sprachmix, als Leetspeak, zerstückelt oder ROT13 |
 | Jailbreak | Rollenspiele und Tricks, die Schutzregeln aushebeln |
 | System-Prompt-Leak | Ob der Agent seinen System-Prompt oder Geheimnisse darin verrät |
 | Datenabfluss | Ob Daten über Links, Bilder oder Tool-Aufrufe nach außen gelangen |
 | Tool-Missbrauch | Ob der Agent riskante Tools ohne Rückfrage nutzt |
 | Fremde Kontodaten | Ob ein Konto an private Angaben eines anderen kommt (braucht zwei Testkonten) |
+| Unsichere Ausgaben | Ob der Agent `<script>`, Event-Handler, `javascript:`-Links oder Iframes ungefiltert ausgibt (OWASP LLM05) |
+| Ressourcenverbrauch | Ob eine einzelne Anfrage riesige Antworten (über 6000 Zeichen) oder über 60 s Rechenzeit auslöst (LLM10). Kostet beim Ziel Tokens |
+| Erfundene Fakten | Ob der Agent Preise, Regeln oder Lieferdaten zu Dingen erfindet, die es nicht gibt (LLM09); am genauesten mit Richter-Modell |
 | Mehrstufig | Angriffe über mehrere Nachrichten (braucht ein Angreifer-Modell) |
 
 Für MCP-Server: Zugangsschutz, Tool-Poisoning, Riskante Tools, Parameter-Injection und Manipulierte Ausgaben.

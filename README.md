@@ -30,7 +30,7 @@ Testquellen (garak, Promptfoo, Skills) und den ersten Lauf. Die Anleitung steht 
 | Demo-Lauf | Vorbereiteter Lauf gegen einen fiktiven Kundenservice-Agenten, braucht kein Modell (in der Einrichtung und unter Hilfe) |
 | Ziele | Eigenes Modell mit System-Prompt und Honeypot-Tools, Agent mit OpenAI-kompatibler API oder beliebiger HTTP-Endpunkt (JSON-Vorlage) |
 | Anmeldung | API-Schlüssel, eigener Header, Basic Auth, Login-Aufruf mit Token oder Cookie, TOTP für 2FA, mehrere Testkonten mit Rollen |
-| Testmodule | 23 Angriffe: Prompt Injection, Jailbreak, System-Prompt-Leak, Datenabfluss, Tool-Missbrauch, Zugriff auf fremde Kontodaten |
+| Testmodule | 47 Angriffe in 11 Modulen: Prompt Injection, indirekte Injection (Dokumente, Webseiten, unsichtbare Zeichen), Sprachen & Verschleierung, Jailbreak, System-Prompt-Leak, Datenabfluss, Tool-Missbrauch, fremde Kontodaten, unsichere Ausgaben, Ressourcenverbrauch, erfundene Fakten; dazu mehrstufige Angriffe |
 | Bewertung | Canary-Token, Honeypot-Tool-Aufrufe, Leak-Marker, private Angaben anderer Konten; optional Richter-Modell für unklare Fälle |
 
 ### Einen eigenen Agenten testen

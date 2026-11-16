@@ -9,7 +9,7 @@ export interface HeatRow {
   attempts: number;
 }
 
-const COLUMNS = ["LLM01", "LLM02", "LLM05", "LLM06", "LLM07", "LLM08", "LLM10"];
+const COLUMNS = ["LLM01", "LLM02", "LLM05", "LLM06", "LLM07", "LLM08", "LLM09", "LLM10"];
 
 /** Testmodule × OWASP-LLM-Kategorien, Farbe = Erfolgsquote der Angriffe. */
 export function Heatmap({ rows }: { rows: HeatRow[] }) {

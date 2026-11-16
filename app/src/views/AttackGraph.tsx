@@ -32,6 +32,7 @@ import {
   ShieldAlert,
   Users,
   X,
+  MonitorSmartphone,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -45,7 +46,22 @@ type Kind = "attacker" | "agent" | "tool" | "data" | "external";
 type State = "untested" | "running" | "stopped" | "breach" | "error";
 type GraphNodeData = { label: string; sub: string; kind: Kind; icon: string; state: State; selected: boolean };
 
-const ICONS = { Crosshair, Bot, Mail, Receipt, Search, Database, FileLock2, Globe, PenLine, Send, Server, Users, Zap };
+const ICONS = {
+  Crosshair,
+  Bot,
+  Mail,
+  Receipt,
+  Search,
+  Database,
+  FileLock2,
+  Globe,
+  MonitorSmartphone,
+  PenLine,
+  Send,
+  Server,
+  Users,
+  Zap,
+};
 
 const STATE_COLOR: Record<State, string> = {
   untested: "#2a3a5c",

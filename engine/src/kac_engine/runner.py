@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
+import time
 from dataclasses import dataclass, field
 
 from . import attacks as lib
@@ -245,6 +246,7 @@ async def _attack(
     history: list[dict] = []
     turns: list[str] = []
     reply, calls = "", []
+    elapsed = 0.0
     transcript: list[str] = []
     try:
         for turn in attack.turns:
@@ -252,7 +254,9 @@ async def _attack(
             turns.append(text)
             history.append({"role": "user", "content": text})
             await hub.publish("message", run_id, attack_id=attack_id, role="attacker", text=text)
+            started = time.perf_counter()
             reply, turn_calls = await convo.reply(me, history)
+            elapsed += time.perf_counter() - started
             calls.extend(turn_calls)
             history.append({"role": "assistant", "content": reply})
             shown = next(
@@ -288,6 +292,7 @@ async def _attack(
         leak_markers=target.leak_markers,
         other_marker=other_acc.marker if other_acc else None,
         honeypot=target.kind == TargetKind.MODEL and target.honeypot_tools,
+        elapsed=elapsed,
     )
     verdict = detect(ctx)
     if verdict is None:
