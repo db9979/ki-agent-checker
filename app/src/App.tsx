@@ -14,7 +14,8 @@ import {
 import { useEffect, useState } from "react";
 import { api, subscribe } from "./lib/engine";
 import { dispatch, setOnline, useRun } from "./lib/runStore";
-import { openOnboarding, useOnboarding } from "./lib/onboarding";
+import { useHelpRequests } from "./lib/help";
+import { openOnboarding, setOnboarding, useOnboarding } from "./lib/onboarding";
 import { setEffectsMode, useEffectsMode } from "./lib/settings";
 import { AttackGraph } from "./views/AttackGraph";
 import { Compare } from "./views/Compare";
@@ -45,6 +46,15 @@ export default function App() {
   const effects = useEffectsMode();
 
   const onboarding = useOnboarding();
+  const helpRequests = useHelpRequests();
+
+  // „?“-Links springen in die Hilfe (auch aus der Einrichtung heraus, die dafür pausiert)
+  useEffect(() => {
+    if (!helpRequests) return;
+    setView("help");
+    if (onboarding.open) setOnboarding({ open: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [helpRequests]);
 
   useEffect(() => subscribe(dispatch, setOnline), []);
 
@@ -123,7 +133,7 @@ export default function App() {
         {view === "models" && <Models />}
         {view === "projects" && <Projects onRunStarted={() => setView("live")} />}
         {view === "skills" && <Skills />}
-        {view === "help" && <Help onStartDemo={startDemo} />}
+        {view === "help" && <Help key={helpRequests} onStartDemo={startDemo} />}
       </main>
       <Onboarding onNavigate={setView} onRunStarted={() => setView("live")} onStartDemo={startDemo} />
       <OnboardingResume />

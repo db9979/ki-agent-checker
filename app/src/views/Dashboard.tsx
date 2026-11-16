@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { HelpLink } from "../components/HelpLink";
 import { Crosshair, Play, Rocket, ShieldAlert } from "lucide-react";
 import type { View } from "../App";
 import { openOnboarding } from "../lib/onboarding";
@@ -53,7 +54,9 @@ export function Dashboard({ onNavigate }: { onNavigate: (v: View) => void }) {
     <div className="grid grid-cols-12 gap-4">
       <header className="col-span-12 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            Dashboard <HelpLink anchor="ergebnisse-lesen" />
+          </h1>
           <p className="text-sm text-muted">{live ? run.target : last ? last.target : "Noch kein Testlauf"}</p>
         </div>
         <div className="flex items-start gap-2">

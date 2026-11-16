@@ -59,6 +59,19 @@ Ein Ziel ist das, was angegriffen wird. Mit **+ Ziel** im Projekt (oder in der E
 | MCP-Server, Audit | Prüft einen MCP-Server (Streamable HTTP, meist `…/mcp`): Zugangsschutz, Tool-Beschreibungen, Rechte, Parameter, Ausgaben |
 | MCP-Server, ein Tool als Agent | Steckt hinter einem MCP-Tool selbst ein Sprachmodell, laufen alle Chat-Angriffe gegen dieses Tool |
 
+### Ziel automatisch erkennen
+
+Oben im Ziel-Formular die Adresse einfügen (und falls nötig einen API-Schlüssel) und **Erkennen** klicken.
+Die App schickt nur eine harmlose Begrüßung und erkennt:
+
+- **MCP-Server** an der Antwort auf `initialize`, samt Servername
+- **OpenAI-kompatible APIs** an `…/models`, samt Modellliste zur Auswahl
+- **JSON-Endpunkte**: probiert übliche Feldnamen (`message`, `prompt`, `input`, `query`, …) und findet das
+  Feld mit dem Antworttext, auch verschachtelt (z. B. `result.answer`)
+
+Verlangt das Ziel eine Anmeldung, stellt die App „API-Schlüssel / Bearer-Token“ ein. Die erkannten Felder
+lassen sich vor dem Speichern prüfen und ändern. Auch die Erkennung prüft den Scope des Projekts.
+
 **Prüfen** schickt eine harmlose Nachricht und zeigt Antwortzeit und Antwort. Beim MCP-Server zeigt es
 Servername und Tools.
 
@@ -140,8 +153,22 @@ Modelle und MCP-Tools funktionieren damit genauso wie bei den eigenen Angriffen.
 
 ## Einen Lauf starten und verfolgen
 
-Unter **Projekte** beim Ziel auf **Testen** klicken, Testquelle und Module wählen, **Angriff starten**.
-Die App springt in den **Live-Angriff**:
+Unter **Projekte** beim Ziel auf **Testen** klicken, Testquelle und Profil wählen, **Angriff starten**.
+
+### Testprofile
+
+| Profil | Was läuft |
+| --- | --- |
+| Schnell | Je Modul zwei Angriffe, ohne mehrstufige. Für einen ersten Eindruck in ein bis zwei Minuten |
+| Standard | Alle verfügbaren Angriffe aller Module |
+| Gründlich | Alle Angriffe plus mehrstufige über 8 Runden (braucht ein Angreifer-Modell); mit Richter-Modell am genauesten |
+| Eigene Auswahl | Module einzeln an- und abwählen |
+
+Unter den Profilen steht, wie viele Angriffe ungefähr laufen und wie lange es etwa dauert.
+
+### Live verfolgen
+
+Nach dem Start springt die App in den **Live-Angriff**:
 
 - **Angriffspfad**: jeder Angriff als Linie durch vier Schutzschichten (Eingabe-Schutz, Modell/Prompt,
   Tools & Daten, Außenwelt). Eine grüne Sperre zeigt, wo er gestoppt wurde, ein roter Pfeil, wie weit er
@@ -194,6 +221,8 @@ für schwache Geräte wie den uConsole herunter. Unter 1400 px Breite zeigt die 
 
 **„Engine nicht erreichbar“ unten links.** Die App startet ihre Engine beim Start selbst. Hilft ein
 Neustart der App nicht, steht die letzte Ausgabe der Engine in der Fehlermeldung.
+
+**Überall ein kleines „?“.** Es öffnet die passende Stelle dieser Anleitung.
 
 **Ziel wird abgelehnt.** Die Adresse liegt nicht im Scope des Projekts. Scope um die Adresse ergänzen
 (neues Projekt anlegen) oder die Adresse im Ziel korrigieren.

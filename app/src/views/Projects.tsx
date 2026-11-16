@@ -13,6 +13,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { HelpLink } from "../components/HelpLink";
 import { useState } from "react";
 import { loadScanner, saveScanner, ScannerOptions, type ScannerSettings } from "../components/ScannerOptions";
 import { TargetForm } from "../components/TargetForm";
@@ -55,6 +56,20 @@ function CodeInputs({
   );
 }
 
+type Profile = "quick" | "standard" | "thorough" | "custom";
+
+const PROFILES: { key: Profile; label: string; short: string; hint: string }[] = [
+  { key: "quick", label: "Schnell", short: "2 je Modul", hint: "Je Modul zwei Angriffe, ohne mehrstufige, für einen ersten Eindruck" },
+  { key: "standard", label: "Standard", short: "alle Angriffe", hint: "Alle verfügbaren Angriffe aller Module" },
+  {
+    key: "thorough",
+    label: "Gründlich",
+    short: "+ mehrstufig",
+    hint: "Alle Angriffe plus mehrstufige über 8 Runden; mit Richter-Modell am genauesten",
+  },
+  { key: "custom", label: "Eigene Auswahl", short: "Module wählen", hint: "Module einzeln an- und abwählen" },
+];
+
 function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: () => void; onClose: () => void }) {
   const { data: allModules } = useApi<AttackModuleInfo[]>("/attack-modules");
   const isMcp = target.kind === "mcp";
@@ -72,6 +87,18 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
   const [codes, setCodes] = useState<Record<string, string>>({});
   const missingCode = manual && names.some((n) => !codes[n]);
   const [source, setSource] = useState<"own" | "garak" | "promptfoo">("own");
+  const [profile, setProfile] = useState<Profile>("standard");
+  const isUnavailable = (m: AttackModuleInfo) =>
+    m.needs_accounts > pairs || (noCalls && !!m.calls_tools) || (!!m.needs_attacker && !attacker);
+  const chosen = (modules ?? []).filter((m) => {
+    if (isUnavailable(m)) return false;
+    if (profile === "custom") return !off.has(m.key);
+    if (profile === "quick") return !m.needs_attacker;
+    return true;
+  });
+  const cap = profile === "quick" ? 2 : null;
+  const attackCount = chosen.reduce((n, m) => n + (m.attacks ? Math.min(m.attacks, cap ?? m.attacks) : 1), 0);
+  const minutes = Math.max(1, Math.round((attackCount * ((target.delay ?? 0.5) + 3) * (judge ? 1.5 : 1)) / 60));
   const [scanner, setScanner] = useState<ScannerSettings>(loadScanner("garak"));
   const pick = (s: "own" | "garak" | "promptfoo") => {
     setSource(s);
@@ -85,10 +112,11 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
         method: "POST",
         body: JSON.stringify({
           target_id: target.id,
-          modules: (modules ?? []).map((m) => m.key).filter((k) => !off.has(k)),
+          modules: chosen.map((m) => m.key),
+          max_per_module: cap,
           judge_provider_id: judge || null,
           attacker_provider_id: attacker || null,
-          max_turns: maxTurns,
+          max_turns: profile === "thorough" ? Math.max(maxTurns, 8) : maxTurns,
           mfa_codes: manual ? codes : {},
           scanner: source === "own" ? null : scanner,
         }),
@@ -104,6 +132,9 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
     <div className="mt-3 space-y-2 rounded-lg border border-red/30 bg-red/5 p-3">
       <div className="flex items-center text-xs font-semibold text-red">
         <Crosshair size={13} className="mr-1.5" /> Testlauf gegen {target.name}
+        <span className="ml-1.5">
+          <HelpLink anchor="testquellen" />
+        </span>
         <button onClick={onClose} className="ml-auto text-muted hover:text-text">
           <X size={14} />
         </button>
@@ -130,7 +161,30 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
         </div>
       )}
       {source !== "own" && <ScannerOptions value={scanner} onChange={setScanner} />}
-      <div className={`grid grid-cols-2 gap-1 ${source !== "own" ? "hidden" : ""}`}>
+      {source === "own" && !isMcp && (
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-4 gap-1">
+            {PROFILES.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setProfile(p.key)}
+                title={p.hint}
+                className={`rounded-md border px-2 py-1 text-left text-[11px] ${
+                  profile === p.key ? "border-red/60 bg-red/10 text-red" : "border-line text-muted hover:text-text"
+                }`}
+              >
+                <div className="font-medium">{p.label}</div>
+                <div className="truncate text-[9px] opacity-80">{p.short}</div>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted">
+            {PROFILES.find((p) => p.key === profile)!.hint} · ≈ {attackCount} Angriffe, ca. {minutes} Min.
+            {profile === "thorough" && !attacker && " Für mehrstufige Angriffe unten ein Angreifer-Modell wählen."}
+          </p>
+        </div>
+      )}
+      <div className={`grid grid-cols-2 gap-1 ${source !== "own" || (!isMcp && profile !== "custom") ? "hidden" : ""}`}>
         {(modules ?? []).map((m) => {
           const noAttacker = !!m.needs_attacker && !attacker;
           const unavailable = m.needs_accounts > pairs || (noCalls && !!m.calls_tools) || noAttacker;
@@ -448,7 +502,7 @@ export function Projects({ onRunStarted }: { onRunStarted: () => void }) {
           <input className={input} value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
         <label className="block text-xs text-muted">
-          Scope: erlaubte Ziele, eins pro Zeile
+          Scope: erlaubte Ziele, eins pro Zeile <HelpLink anchor="projekte-und-berechtigung" />
           <textarea
             className={`${input} h-24 font-mono`}
             value={scope}

@@ -1,8 +1,9 @@
 import { ExternalLink, Play, Rocket } from "lucide-react";
-import { Children, isValidElement, useRef, type ReactNode } from "react";
+import { Children, isValidElement, useEffect, useRef, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import doc from "../../../docs/ANLEITUNG.md?raw";
+import { clearHelpAnchor, peekHelpAnchor } from "../lib/help";
 import { openOnboarding } from "../lib/onboarding";
 import { openLink } from "../lib/open";
 
@@ -32,6 +33,20 @@ export function Help({ onStartDemo }: { onStartDemo: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   const jump = (id: string) =>
     box.current?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  useEffect(() => {
+    const anchor = peekHelpAnchor();
+    if (!anchor) return;
+    const t = setTimeout(() => {
+      clearHelpAnchor();
+      jump(anchor);
+      const el = box.current?.querySelector(`#${CSS.escape(anchor)}`);
+      el?.classList.add("help-flash");
+      setTimeout(() => el?.classList.remove("help-flash"), 1600);
+    }, 60);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const components: Components = {
     h1: () => null,

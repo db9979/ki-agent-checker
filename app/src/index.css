@@ -182,3 +182,18 @@ body {
     animation: none;
   }
 }
+
+/* Hervorhebung, wenn ein „?“ in die Hilfe springt */
+.help-flash {
+  animation: help-flash 1.6s ease-out;
+}
+@keyframes help-flash {
+  0%,
+  40% {
+    background: #22d3ee22;
+    border-radius: 6px;
+  }
+  100% {
+    background: transparent;
+  }
+}

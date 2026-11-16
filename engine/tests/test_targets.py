@@ -376,3 +376,21 @@ async def test_basic_auth_with_totp_header(monkeypatch):
     assert await _send(target, {"password": "pw-a", "totp_secret": secret}) == "basic ok"
     with pytest.raises(TargetError, match="TOTP"):
         await _send(target, {"password": "pw-a"})
+
+
+def test_plan_limits_attacks_per_module():
+    from kac_engine.runner import plan
+    from kac_engine.targets import Target
+
+    t = Target(
+        id="t",
+        project_id="p",
+        name="x",
+        kind="http",
+        url="https://x",
+        created_at="2026-01-01T00:00:00Z",
+    )
+    full = plan(t, ["prompt_injection", "jailbreak"])
+    quick = plan(t, ["prompt_injection", "jailbreak"], max_per_module=2)
+    assert all(len(items) == 2 for _, items in quick)
+    assert sum(len(i) for _, i in full) > sum(len(i) for _, i in quick)
