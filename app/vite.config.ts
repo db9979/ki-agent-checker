@@ -6,7 +6,8 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  // fs.allow: die Anleitung unter ../docs wird in die Hilfe eingebunden
+  server: { port: 1420, strictPort: true, fs: { allow: [".."] } },
   envPrefix: ["VITE_", "TAURI_ENV_"],
   build: {
     target: "es2022",

@@ -4,6 +4,7 @@ import {
   FolderKanban,
   GitCompareArrows,
   Gauge,
+  LifeBuoy,
   LayoutDashboard,
   Network,
   Server,
@@ -13,12 +14,15 @@ import {
 import { useEffect, useState } from "react";
 import { api, subscribe } from "./lib/engine";
 import { dispatch, setOnline, useRun } from "./lib/runStore";
+import { openOnboarding, useOnboarding } from "./lib/onboarding";
 import { setEffectsMode, useEffectsMode } from "./lib/settings";
 import { AttackGraph } from "./views/AttackGraph";
 import { Compare } from "./views/Compare";
 import { Dashboard } from "./views/Dashboard";
+import { Help } from "./views/Help";
 import { LiveAttack } from "./views/LiveAttack";
 import { Models } from "./views/Models";
+import { Onboarding, OnboardingResume } from "./views/Onboarding";
 import { Projects } from "./views/Projects";
 import { Skills } from "./views/Skills";
 
@@ -30,16 +34,28 @@ const NAV = [
   { id: "models", label: "Modelle", icon: Server },
   { id: "projects", label: "Projekte", icon: FolderKanban },
   { id: "skills", label: "Skills", icon: BookOpen },
+  { id: "help", label: "Hilfe", icon: LifeBuoy },
 ] as const;
 
-type View = (typeof NAV)[number]["id"];
+export type View = (typeof NAV)[number]["id"];
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const run = useRun();
   const effects = useEffectsMode();
 
+  const onboarding = useOnboarding();
+
   useEffect(() => subscribe(dispatch, setOnline), []);
+
+  // Erster Start: Einrichtung öffnen, solange noch kein Projekt existiert
+  useEffect(() => {
+    if (!run.online || onboarding.done || onboarding.open || onboarding.step > 0) return;
+    api<unknown[]>("/projects")
+      .then((p) => p.length === 0 && openOnboarding())
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run.online]);
 
   const startDemo = async () => {
     await api("/runs/demo", { method: "POST", body: JSON.stringify({ delay: 0.6 }) });
@@ -100,14 +116,17 @@ export default function App() {
         </div>
       </nav>
       <main className="flex-1 overflow-y-auto p-4 min-[1400px]:p-6">
-        {view === "dashboard" && <Dashboard onStartDemo={startDemo} />}
-        {view === "live" && <LiveAttack onStartDemo={startDemo} />}
+        {view === "dashboard" && <Dashboard onNavigate={setView} />}
+        {view === "live" && <LiveAttack onNavigate={setView} />}
         {view === "graph" && <AttackGraph />}
         {view === "compare" && <Compare />}
         {view === "models" && <Models />}
         {view === "projects" && <Projects onRunStarted={() => setView("live")} />}
         {view === "skills" && <Skills />}
+        {view === "help" && <Help onStartDemo={startDemo} />}
       </main>
+      <Onboarding onNavigate={setView} onRunStarted={() => setView("live")} onStartDemo={startDemo} />
+      <OnboardingResume />
     </div>
   );
 }

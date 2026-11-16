@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
-import { Play, ShieldAlert } from "lucide-react";
+import { Crosshair, Play, Rocket, ShieldAlert } from "lucide-react";
+import type { View } from "../App";
+import { openOnboarding } from "../lib/onboarding";
 import { useMemo } from "react";
 import { ModuleRadar, TrendChart } from "../components/Charts";
 import { Heatmap, type HeatRow } from "../components/Heatmap";
@@ -13,7 +15,7 @@ import type { Finding, RunSummary, Skill } from "../lib/types";
 import { useApi } from "../lib/useApi";
 import { OWASP_LABEL, SEVERITY_COLOR, SEVERITY_LABEL } from "../lib/ui";
 
-export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
+export function Dashboard({ onNavigate }: { onNavigate: (v: View) => void }) {
   const run = useRun();
   const { data: runs } = useApi<RunSummary[]>("/runs", [run.status]);
   const { data: skills } = useApi<Skill[]>("/skills");
@@ -56,15 +58,34 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
         </div>
         <div className="flex items-start gap-2">
           {reportId && <ReportButton runId={reportId} />}
-          <button
-            onClick={onStartDemo}
-            disabled={run.status === "running"}
-            className="glow-cyan flex items-center gap-2 rounded-xl bg-cyan/15 px-4 py-2 text-sm font-medium text-cyan transition hover:bg-cyan/25 disabled:opacity-40"
-          >
-            <Play size={16} /> Demo-Lauf starten
-          </button>
         </div>
       </header>
+
+      {!live && runs?.length === 0 && (
+        <section className="panel col-span-12 flex flex-wrap items-center gap-4 border-cyan/30 p-5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-cyan/10">
+            <Rocket size={22} className="text-cyan" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">Noch kein Testlauf</div>
+            <p className="text-sm text-muted">
+              Die Einrichtung führt in wenigen Schritten zum ersten Angriff: Projekt, Ziel, Testquellen, Start.
+            </p>
+          </div>
+          <button
+            onClick={() => openOnboarding()}
+            className="glow-cyan flex items-center gap-2 rounded-xl bg-cyan/15 px-4 py-2 text-sm font-medium text-cyan transition hover:bg-cyan/25"
+          >
+            <Play size={15} /> Einrichtung starten
+          </button>
+          <button
+            onClick={() => onNavigate("projects")}
+            className="flex items-center gap-2 rounded-xl border border-line px-4 py-2 text-sm text-muted transition hover:text-text"
+          >
+            <Crosshair size={15} /> Zu den Projekten
+          </button>
+        </section>
+      )}
 
       <section className="panel col-span-12 flex flex-col items-center justify-center p-5 md:col-span-4">
         <ScoreGauge score={score} />
@@ -134,7 +155,7 @@ export function Dashboard({ onStartDemo }: { onStartDemo: () => void }) {
       <section className="panel col-span-12 p-5">
         <h2 className="mb-3 text-sm font-semibold text-muted">Findings und Gegenmaßnahmen</h2>
         {findings.length === 0 ? (
-          <p className="text-sm text-muted">Keine Findings. Starte einen Demo-Lauf, um die Ansicht zu füllen.</p>
+          <p className="text-sm text-muted">Keine Findings. Starte unter Projekte einen Testlauf, um die Ansicht zu füllen.</p>
         ) : (
           <div className="space-y-3">
             {findings.map((f, i) => (

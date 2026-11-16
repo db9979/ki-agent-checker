@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { Loader2, Play, Square, XCircle } from "lucide-react";
+import { Crosshair, Loader2, Square, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { View } from "../App";
 import { AttackPath } from "../components/AttackPath";
 import { ReplayBar } from "../components/hud/ReplayBar";
 import { Terminal } from "../components/Terminal";
@@ -25,7 +26,7 @@ function Stat({ value, label, color }: { value: number | string; label: string; 
   );
 }
 
-export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
+export function LiveAttack({ onNavigate }: { onNavigate: (v: View) => void }) {
   const run = useRun();
   const full = useEffectsMode() === "voll";
   const [selected, setSelected] = useState<string | null>(null);
@@ -69,13 +70,15 @@ export function LiveAttack({ onStartDemo }: { onStartDemo: () => void }) {
                 <Square size={14} /> Abbrechen
               </button>
             )}
-            <button
-              onClick={onStartDemo}
-              disabled={run.status === "running"}
-              className="glow-cyan flex items-center gap-2 rounded-xl bg-cyan/15 px-4 py-2 text-sm font-medium text-cyan transition hover:bg-cyan/25 disabled:opacity-40"
-            >
-              <Play size={16} /> Demo
-            </button>
+            {run.status === "idle" && (
+              <button
+                onClick={() => onNavigate("projects")}
+                className="flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm text-muted transition hover:text-text"
+                title="Ziel unter Projekte wählen und testen"
+              >
+                <Crosshair size={15} /> Ziel testen
+              </button>
+            )}
           </div>
         </div>
       </header>

@@ -192,6 +192,38 @@ async def check(tool: str, cmd: str) -> dict:
     return {"ok": True, "version": version[:120]}
 
 
+EMAIL = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
+
+
+async def promptfoo_email(cmd: str) -> dict:
+    """Liest die bei Promptfoo hinterlegte E-Mail (Pflicht für Red-Team-Scans)."""
+    args = split_cmd(cmd, "promptfoo")
+    if not shutil.which(args[0], path=search_path()) and not Path(args[0]).is_file():
+        return {
+            "ok": False,
+            "email": "",
+            "error": f"„{args[0]}“ nicht gefunden. {INSTALL_HINT['promptfoo']}",
+        }
+    try:
+        code, out = await _exec([*args, "config", "get", "email"], timeout=180)
+    except ScannerError as exc:
+        return {"ok": False, "email": "", "error": str(exc)}
+    found = EMAIL.search(out) if code == 0 else None
+    return {"ok": True, "email": found.group(0) if found else ""}
+
+
+async def set_promptfoo_email(cmd: str, email: str) -> dict:
+    """Hinterlegt die E-Mail bei Promptfoo (entspricht „promptfoo config set email …“)."""
+    email = email.strip()
+    if not EMAIL.fullmatch(email):
+        raise ScannerError("Bitte eine gültige E-Mail-Adresse angeben")
+    args = split_cmd(cmd, "promptfoo")
+    code, out = await _exec([*args, "config", "set", "email", email], timeout=180)
+    if code != 0:
+        return {"ok": False, "email": "", "error": out.strip()[-300:] or f"Exit-Code {code}"}
+    return {"ok": True, "email": email}
+
+
 # ---------------------------------------------------------------------------
 # Auswertung
 

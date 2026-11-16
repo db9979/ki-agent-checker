@@ -98,6 +98,11 @@ class CheckIn(BaseModel):
     mfa_codes: dict[str, str] = Field(default_factory=dict)
 
 
+class PromptfooEmail(BaseModel):
+    cmd: str = ""
+    email: str
+
+
 class DemoRunIn(BaseModel):
     project_id: str | None = None
     delay: float = 0.6
@@ -542,6 +547,20 @@ def create_app(
     async def check_scanner(tool: str, cmd: str = "") -> dict:
         try:
             return await scanners.check(tool, cmd)
+        except scanners.ScannerError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.get("/scanners/promptfoo/email", dependencies=protected)
+    async def get_promptfoo_email(cmd: str = "") -> dict:
+        try:
+            return await scanners.promptfoo_email(cmd)
+        except scanners.ScannerError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.post("/scanners/promptfoo/email", dependencies=protected)
+    async def set_promptfoo_email(body: PromptfooEmail) -> dict:
+        try:
+            return await scanners.set_promptfoo_email(body.cmd, body.email)
         except scanners.ScannerError as exc:
             raise HTTPException(422, str(exc)) from exc
 

@@ -206,3 +206,23 @@ def test_promptfoo_email_prompt_fails_with_instructions(engine):
     assert run["status"] == "failed"
     err = [e for e in client.get(f"/runs/{run_id}/events").json() if e["type"] == "run.error"]
     assert "promptfoo config set email" in err[0]["error"]
+
+
+def test_promptfoo_email_setup(engine, tmp_path, monkeypatch):
+    client, _ = engine
+    monkeypatch.setenv("KAC_FAKE_PF_HOME", str(tmp_path))
+    cmd = f'"{sys.executable}" "{FAKES / "fake_promptfoo.py"}"'
+    assert client.get("/scanners/promptfoo/email", params={"cmd": cmd}).json() == {
+        "ok": True,
+        "email": "",
+    }
+    bad = client.post("/scanners/promptfoo/email", json={"cmd": cmd, "email": "kein-mail"})
+    assert bad.status_code == 422
+    ok = client.post(
+        "/scanners/promptfoo/email", json={"cmd": cmd, "email": "test@example.com"}
+    ).json()
+    assert ok == {"ok": True, "email": "test@example.com"}
+    got = client.get("/scanners/promptfoo/email", params={"cmd": cmd}).json()
+    assert got["email"] == "test@example.com"
+    missing = client.get("/scanners/promptfoo/email", params={"cmd": "gibt-es-nicht-kac"}).json()
+    assert not missing["ok"]
