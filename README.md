@@ -183,11 +183,16 @@ uv run --project engine python scripts/build_sidecar.py      # Engine als Einzel
 cd app && npx tauri build --config src-tauri/tauri.release.conf.json
 ```
 
-Der Workflow `Desktop-Build` baut automatisch bei jedem Push auf `main` und bei Tags `v*`:
+Fertige Installer gibt es unter [Releases](https://github.com/db9979/ki-agent-checker/releases/latest).
+
+Der Workflow `Desktop-Build` baut automatisch bei jedem Push auf `main` und bei Tags `v*`.
+Ein Tag legt zusätzlich ein GitHub Release mit allen Installern an. Die Version im Tag muss zu
+`app/src-tauri/tauri.conf.json` passen, z. B. `git tag v0.1.0 && git push origin v0.1.0`.
 
 | System | Pakete |
 | --- | --- |
 | Windows (x64) | MSI, EXE |
+| Windows (ARM64) | MSI, EXE |
 | macOS (Apple Silicon) | DMG |
 | Linux (x64) | DEB, AppImage |
 | Linux (ARM64), z. B. ClockworkPi uConsole mit Raspberry Pi OS | DEB, AppImage |
