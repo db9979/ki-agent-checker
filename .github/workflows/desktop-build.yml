@@ -8,6 +8,11 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Als GitHub Release veröffentlichen (Version aus tauri.conf.json)"
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -95,11 +100,12 @@ jobs:
             app/src-tauri/target/release/bundle/**/*.deb
           if-no-files-found: warn
 
-  # Bei einem Tag v* (z. B. v0.1.0) landen alle Installer als GitHub Release.
+  # Bei einem Tag v* (z. B. v0.1.0) oder manuell mit „release“ landen alle Installer
+  # als GitHub Release. Manuell legt der Release den Tag v<Version> selbst an.
   release:
     name: Release veröffentlichen
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -109,9 +115,10 @@ jobs:
       - name: Version prüfen
         run: |
           APP=$(jq -r .version app/src-tauri/tauri.conf.json)
-          if [ "v$APP" != "$GITHUB_REF_NAME" ]; then
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "v$APP" != "$GITHUB_REF_NAME" ]; then
             echo "Tag $GITHUB_REF_NAME passt nicht zur App-Version $APP (app/src-tauri/tauri.conf.json)"; exit 1
           fi
+          echo "TAG=v$APP" >> "$GITHUB_ENV"
 
       - uses: actions/download-artifact@v4
         with:
@@ -138,5 +145,5 @@ jobs:
           Die Installer sind nicht signiert. Windows SmartScreen: „Weitere Informationen“ → „Trotzdem ausführen“. macOS: beim ersten Start unter Systemeinstellungen → Datenschutz & Sicherheit auf „Dennoch öffnen“ klicken.
           NOTES
           sed -i 's/^          //' notes.md
-          gh release create "$GITHUB_REF_NAME" --title "KI-Agent-Checker $GITHUB_REF_NAME" \
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "KI-Agent-Checker $TAG" \
             --notes-file notes.md --generate-notes $(cat files.txt)
