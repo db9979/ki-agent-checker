@@ -1,4 +1,5 @@
-import { KeyRound, Plus, Trash2, UserRound } from "lucide-react";
+import { CheckCircle2, KeyRound, Loader2, Plus, Trash2, UserRound, Wand2, XCircle } from "lucide-react";
+import { HelpLink } from "./HelpLink";
 import { useState } from "react";
 import { api } from "../lib/engine";
 import type { AuthKind, Project, Provider, Target, TargetKind } from "../lib/types";
@@ -72,6 +73,21 @@ const emptyAccount = (n: number): AccountDraft => ({
   marker: "",
 });
 
+interface DetectResult {
+  ok: boolean;
+  kind?: TargetKind;
+  url: string;
+  model?: string | null;
+  models?: string[];
+  request_template?: string;
+  response_path?: string;
+  reply?: string;
+  server?: string;
+  needs_auth?: boolean;
+  note?: string;
+  error?: string;
+}
+
 const orNull = (s: string) => (s.trim() ? s.trim() : null);
 
 export function TargetForm({
@@ -125,6 +141,42 @@ export function TargetForm({
   const [toolPolicy, setToolPolicy] = useState<ToolPolicy>(initial?.mcp_tool_calls ?? "readonly");
   const [leakMarkers, setLeakMarkers] = useState((initial?.leak_markers ?? []).join("\n"));
   const [error, setError] = useState<string | null>(null);
+  const [detectUrl, setDetectUrl] = useState("");
+  const [detectToken, setDetectToken] = useState("");
+  const [detected, setDetected] = useState<DetectResult | "busy" | null>(null);
+  const [models, setModels] = useState<string[]>([]);
+
+  const runDetect = async () => {
+    setDetected("busy");
+    try {
+      const r = await api<DetectResult>("/targets/detect", {
+        method: "POST",
+        body: JSON.stringify({
+          project_id: project.id,
+          url: detectUrl,
+          token: detectToken || null,
+          verify_tls: !trustSelfSigned,
+        }),
+      });
+      setDetected(r);
+      if (!r.ok || !r.kind) return;
+      setKind(r.kind);
+      setUrl(r.url);
+      if (r.model) setModel(r.model);
+      setModels(r.models ?? []);
+      if (r.request_template) setTemplate(r.request_template);
+      if (r.response_path !== undefined) setResponsePath(r.response_path);
+      if (!name) setName(r.server ?? new URL(r.url).hostname);
+      if (detectToken) {
+        setAuthKind("bearer");
+        setAccounts([{ ...(accounts[0] ?? emptyAccount(0)), token: detectToken }, ...accounts.slice(1)]);
+      } else if (r.needs_auth) {
+        setAuthKind("bearer");
+      }
+    } catch (e) {
+      setDetected({ ok: false, url: detectUrl, error: String((e as Error).message) });
+    }
+  };
 
   const needsAccount = authKind !== "none";
   const list = needsAccount && accounts.length === 0 ? [emptyAccount(0)] : accounts;
@@ -194,6 +246,49 @@ export function TargetForm({
 
   return (
     <div className="space-y-3">
+      <div className="rounded-lg border border-violet/40 bg-violet/5 p-2.5">
+        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-violet">
+          <Wand2 size={13} /> Automatisch erkennen <HelpLink anchor="ziel-automatisch-erkennen" />
+        </div>
+        <div className="grid grid-cols-[2fr_1fr_auto] gap-1.5">
+          <input
+            className="rounded-md border border-line bg-[#0b1222] px-2 py-1.5 font-mono text-xs outline-none focus:border-violet"
+            value={detectUrl}
+            onChange={(e) => setDetectUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && detectUrl && runDetect()}
+            placeholder="Adresse einfügen, z. B. https://agent.firma.de/api/chat"
+          />
+          <input
+            className="rounded-md border border-line bg-[#0b1222] px-2 py-1.5 font-mono text-xs outline-none focus:border-violet"
+            type="password"
+            value={detectToken}
+            onChange={(e) => setDetectToken(e.target.value)}
+            placeholder="API-Schlüssel (falls nötig)"
+          />
+          <button
+            onClick={runDetect}
+            disabled={!detectUrl || detected === "busy"}
+            className="flex items-center gap-1 rounded-md bg-violet/15 px-3 text-xs text-violet disabled:opacity-40"
+          >
+            {detected === "busy" ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />} Erkennen
+          </button>
+        </div>
+        {detected && detected !== "busy" && (
+          <p className={`mt-1.5 flex items-start gap-1 text-[11px] ${detected.ok ? "text-green" : "text-red"}`}>
+            {detected.ok ? <CheckCircle2 size={12} className="mt-0.5 shrink-0" /> : <XCircle size={12} className="mt-0.5 shrink-0" />}
+            <span>
+              {detected.ok ? detected.note : detected.error}
+              {detected.reply && <span className="text-muted"> · Antwort: „{detected.reply.slice(0, 80)}“</span>}
+              {detected.ok && " · Felder unten sind ausgefüllt, bitte prüfen."}
+            </span>
+          </p>
+        )}
+        {!detected && (
+          <p className="mt-1 text-[10px] text-muted">
+            Erkennt MCP-Server, OpenAI-kompatible APIs und JSON-Endpunkte samt Antwortfeld. Schickt nur eine harmlose Begrüßung.
+          </p>
+        )}
+      </div>
       <div className="grid grid-cols-4 gap-1.5">
         {KINDS.map((x) => (
           <button
@@ -210,7 +305,9 @@ export function TargetForm({
           </button>
         ))}
       </div>
-      <p className="text-[11px] text-muted">{k.hint}</p>
+      <p className="text-[11px] text-muted">
+        {k.hint} <HelpLink anchor="ziele" />
+      </p>
 
       <label className="block text-xs text-muted">
         Name
@@ -326,7 +423,12 @@ export function TargetForm({
           ) : kind === "openai_endpoint" ? (
             <label className="block text-xs text-muted">
               Modellname (falls verlangt)
-              <input className={input} value={model} onChange={(e) => setModel(e.target.value)} />
+              <input className={input} value={model} onChange={(e) => setModel(e.target.value)} list="kac-models" />
+              <datalist id="kac-models">
+                {models.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
             </label>
           ) : (
             <div className="grid grid-cols-4 gap-2">
@@ -363,7 +465,7 @@ export function TargetForm({
 
           <div className="rounded-xl border border-line p-3">
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted">
-              <KeyRound size={13} /> Anmeldung
+              <KeyRound size={13} /> Anmeldung <HelpLink anchor="anmeldung-und-testkonten" />
             </div>
             <select className={input} value={authKind} onChange={(e) => setAuthKind(e.target.value as AuthKind)}>
               {AUTHS.map((a) => (

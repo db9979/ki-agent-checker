@@ -9,6 +9,7 @@ import {
   Swords,
   Trash2,
 } from "lucide-react";
+import { HelpLink } from "../components/HelpLink";
 import { useState } from "react";
 import { api } from "../lib/engine";
 import { openLink } from "../lib/open";
@@ -67,7 +68,9 @@ export function Skills() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-2xl font-semibold">Skills</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          Skills <HelpLink anchor="skills" />
+        </h1>
         <p className="text-sm text-muted">
           Angriffe und Gegenmaßnahmen aus Skill-Sammlungen übernehmen. Gelesen werden nur die SKILL.md-Dateien, Skripte
           werden nie ausgeführt.

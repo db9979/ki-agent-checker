@@ -40,6 +40,7 @@ class RunConfig:
     judge: Provider | None = None
     attacker: Provider | None = None  # schreibt die Nachrichten mehrstufiger Angriffe
     max_turns: int = 5
+    max_per_module: int | None = None  # Testprofil „Schnell“: nur die ersten N Angriffe je Modul
     project_id: str | None = None
     mfa_codes: dict[str, str] = field(
         default_factory=dict
@@ -47,7 +48,7 @@ class RunConfig:
 
 
 def plan(
-    target: Target, modules: list[str], attacker: bool = False
+    target: Target, modules: list[str], attacker: bool = False, max_per_module: int | None = None
 ) -> list[tuple[lib.AttackModule, list[tuple[lib.Attack, int, int | None]]]]:
     """Liste der Angriffe: (Modul, [(Angriff, Konto-Index, Index des anderen Kontos)])."""
     usable = [i for i, a in enumerate(target.accounts) if a.identifier and a.marker]
@@ -63,6 +64,8 @@ def plan(
             items = [(a, me, other) for me, other in pairs for a in mod.attacks]
         else:
             items = [(a, 0 if target.accounts else -1, None) for a in mod.attacks]
+        if max_per_module:
+            items = items[:max_per_module]
         result.append((mod, items))
     return result
 
@@ -116,7 +119,9 @@ async def run_target(
 ) -> str:
     run_id = run_id or secrets.token_hex(6)
     target = cfg.target
-    planned = plan(target, cfg.modules, attacker=cfg.attacker is not None)
+    planned = plan(
+        target, cfg.modules, attacker=cfg.attacker is not None, max_per_module=cfg.max_per_module
+    )
     total = sum(len(items) for _, items in planned)
     label = target.describe()
     store.start_run(run_id, cfg.project_id, label)

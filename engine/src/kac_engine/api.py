@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, mcp, providers, report, scanners, skills
+from . import __version__, detect, mcp, providers, report, scanners, skills
 from . import attacks as attack_lib
 from . import compare as compare_lib
 from . import graph as graph_lib
@@ -81,6 +81,9 @@ class RunIn(BaseModel):
         default=None, description="Modell, das mehrstufige Angriffe schreibt"
     )
     max_turns: int = Field(default=5, ge=1, le=10)
+    max_per_module: int | None = Field(
+        default=None, ge=1, le=100, description="Höchstens so viele Angriffe je Modul (Testprofil)"
+    )
     mfa_codes: dict[str, str] = Field(
         default_factory=dict, description="Von Hand eingegebene 2FA-Codes je Testkonto"
     )
@@ -101,6 +104,13 @@ class CheckIn(BaseModel):
 class PromptfooEmail(BaseModel):
     cmd: str = ""
     email: str
+
+
+class DetectIn(BaseModel):
+    project_id: str
+    url: str
+    token: str | None = None
+    verify_tls: bool = True
 
 
 class DemoRunIn(BaseModel):
@@ -279,6 +289,21 @@ def create_app(
         )
         return target
 
+    @app.post("/targets/detect", dependencies=protected)
+    async def detect_target(data: DetectIn) -> dict:
+        project = store.get_project(data.project_id)
+        if not project:
+            raise HTTPException(404, "Projekt nicht gefunden")
+        url = data.url.strip()
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+        if not in_scope(url, project.scope):
+            raise HTTPException(
+                403,
+                f"{url} liegt nicht im Scope des Projekts. Erlaubt: {', '.join(project.scope) or 'nichts'}",
+            )
+        return await detect.detect(url, data.token or None, data.verify_tls)
+
     @app.put("/targets/{target_id}", dependencies=protected)
     def update_target(target_id: str, data: TargetIn) -> Target:
         old = store.get_target(target_id)
@@ -444,6 +469,7 @@ def create_app(
             judge=judge,
             attacker=attacker,
             max_turns=data.max_turns,
+            max_per_module=data.max_per_module,
             project_id=project.id,
             mfa_codes=data.mfa_codes,
         )

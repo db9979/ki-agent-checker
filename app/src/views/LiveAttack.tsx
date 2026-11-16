@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { HelpLink } from "../components/HelpLink";
 import { Crosshair, Loader2, Square, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { View } from "../App";
@@ -85,7 +86,10 @@ export function LiveAttack({ onNavigate }: { onNavigate: (v: View) => void }) {
 
       {run.error && (
         <div className="flex shrink-0 items-center gap-2 rounded-xl border border-red/40 bg-red/10 px-4 py-2 text-sm text-red">
-          <XCircle size={16} /> {run.error}
+          <XCircle size={16} className="shrink-0" /> <span className="flex-1">{run.error}</span>
+          <span className="flex items-center gap-1 text-xs text-muted">
+            Lösungen <HelpLink anchor="häufige-probleme" label="Häufige Probleme und Lösungen" />
+          </span>
         </div>
       )}
 

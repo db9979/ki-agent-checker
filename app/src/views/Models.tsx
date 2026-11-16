@@ -1,4 +1,5 @@
 import { CheckCircle2, Cloud, HardDrive, Loader2, Plug, Search, Trash2, XCircle } from "lucide-react";
+import { HelpLink } from "../components/HelpLink";
 import { useState } from "react";
 import { api } from "../lib/engine";
 import type { ConnectionResult, Provider, ProviderKind } from "../lib/types";
@@ -100,7 +101,9 @@ export function Models() {
   return (
     <div className="grid grid-cols-12 gap-4">
       <header className="col-span-12">
-        <h1 className="text-2xl font-semibold">Modelle</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          Modelle <HelpLink anchor="modelle" />
+        </h1>
         <p className="text-sm text-muted">
           Selbst gehostete und Cloud-Modelle für Angreifer, Richter und Ziel. API-Schlüssel liegen im Schlüsselbund des
           Systems.
