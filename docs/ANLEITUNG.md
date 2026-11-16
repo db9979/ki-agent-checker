@@ -56,7 +56,7 @@ Ein Ziel ist das, was angegriffen wird. Mit **+ Ziel** im Projekt (oder in der E
 | Eigenes Modell | Ein angebundenes Modell mit deinem System-Prompt und Honeypot-Tools, ideal vor dem Livegang |
 | Agent mit OpenAI-API | Ein fertiger Agent mit OpenAI-kompatibler Chat-Schnittstelle (`…/v1`) |
 | HTTP-Endpunkt | Beliebiger JSON-Endpunkt, z. B. das Backend eines Chat-Widgets. Anfrage mit `{{message}}` oder `{{messages}}`, Antwortfeld frei einstellbar |
-| MCP-Server, Audit | Prüft einen MCP-Server (Streamable HTTP, meist `…/mcp`): Zugangsschutz, Tool-Beschreibungen, Rechte, Parameter, Ausgaben |
+| MCP-Server, Audit | Prüft einen MCP-Server über das Netz (Streamable HTTP, meist `…/mcp`) oder lokal (stdio): Zugangsschutz, Tool-Beschreibungen, Rechte, Parameter, Ausgaben |
 | MCP-Server, ein Tool als Agent | Steckt hinter einem MCP-Tool selbst ein Sprachmodell, laufen alle Chat-Angriffe gegen dieses Tool |
 
 ### Ziel automatisch erkennen
@@ -77,13 +77,30 @@ Servername und Tools.
 
 ### Anmeldung und Testkonten
 
-Für Agenten hinter einer Anmeldung: API-Schlüssel/Bearer-Token, eigener Header, Basic Auth oder ein
-Login-Aufruf, der Token oder Cookie liefert. 2FA geht per TOTP-Geheimnis je Konto oder per Code, den du
+Für Agenten hinter einer Anmeldung: API-Schlüssel/Bearer-Token, eigener Header, Basic Auth, ein
+Login-Aufruf, der Token oder Cookie liefert, oder [OAuth](#oauth) mit Anmeldung im Browser. 2FA geht per TOTP-Geheimnis je Konto oder per Code, den du
 vor dem Lauf von Hand eingibst (wird nicht gespeichert).
 
 Mit **zwei Testkonten**, jeweils mit Kennung (z. B. E-Mail) und privater Angabe (z. B. IBAN), prüft das
 Modul „Fremde Kontodaten“, ob ein Konto an die Daten des anderen kommt. Passwörter, Tokens und
 TOTP-Geheimnisse liegen im Schlüsselbund.
+
+### Lokale MCP-Server (stdio)
+
+Viele MCP-Server laufen nicht im Netz, sondern als Programm auf dem eigenen Rechner. Beim Zieltyp
+MCP-Server **Lokal starten (stdio)** wählen und den Startbefehl eintragen, z. B.
+`npx -y @modelcontextprotocol/server-filesystem ./testordner` oder `uvx mcp-server-fetch`. Die App startet den
+Server für jeden Lauf neu und beendet ihn danach. Der Befehl läuft mit deinen Rechten, also nur Server
+starten, denen du vertraust, und für Schreib-Tools einen Testordner nehmen. Der Zugangsschutz wird bei
+stdio übersprungen, weil es keine Netzwerk-Anmeldung gibt.
+
+### OAuth
+
+Für Server mit OAuth-Anmeldung (MCP-Autorisierung) die Anmeldeart **OAuth** wählen, speichern und beim Ziel
+**Mit OAuth anmelden** klicken. Die App findet den Anmeldeserver selbst (`WWW-Authenticate` oder
+`/.well-known/oauth-protected-resource`), registriert sich automatisch, falls der Server das erlaubt
+(sonst eine Client-ID eintragen), und öffnet die Anmeldung im Browser. Danach liegen die Tokens im
+Schlüsselbund und werden vor jedem Lauf erneuert. Läuft die Anmeldung ab, meldet die App das beim Prüfen.
 
 ### MCP-Tools aufrufen
 

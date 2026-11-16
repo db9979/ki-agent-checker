@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { HelpLink } from "../components/HelpLink";
+import { OAuthButton } from "../components/OAuthButton";
 import { useState } from "react";
 import { loadScanner, saveScanner, ScannerOptions, type ScannerSettings } from "../components/ScannerOptions";
 import { TargetForm } from "../components/TargetForm";
@@ -328,7 +329,9 @@ function TargetRow({
       <div className="flex items-center gap-2 text-xs">
         <Icon size={14} className="text-cyan" />
         <span className="font-medium">{t.name}</span>
-        <span className="truncate font-mono text-[10px] text-muted">{t.url ?? "eigenes Modell"}</span>
+        <span className="truncate font-mono text-[10px] text-muted">
+          {t.url ?? (t.mcp_command ? `stdio: ${t.mcp_command}` : "eigenes Modell")}
+        </span>
         <span className="ml-auto flex shrink-0 gap-1">
           <button onClick={test} className="rounded-md bg-panel-2 px-2 py-0.5 text-[11px] text-muted hover:text-text">
             {check === "busy" ? <Loader2 size={12} className="animate-spin" /> : "Prüfen"}
@@ -360,6 +363,7 @@ function TargetRow({
           {t.auth.kind !== "none" && (
             <span className="rounded bg-amber/10 px-1.5 py-0.5 text-[10px] text-amber">Anmeldung: {t.auth.kind}</span>
           )}
+          {t.auth.kind === "oauth" && <OAuthButton targetId={t.id} compact />}
         </div>
       )}
       {check && check !== "busy" && (

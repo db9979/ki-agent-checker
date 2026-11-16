@@ -101,6 +101,7 @@ async def _try_mcp(client: httpx.AsyncClient, url: str, token: str | None) -> di
         return {
             "kind": "mcp",
             "needs_auth": True,
+            "oauth": oauth,
             "note": "MCP-Server verlangt eine Anmeldung"
             + (" (OAuth)" if oauth else ", meist API-Schlüssel / Bearer-Token"),
         }

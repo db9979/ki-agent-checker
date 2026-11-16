@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import secrets
 from dataclasses import dataclass, field
@@ -173,6 +174,123 @@ class McpToolSession(McpClient):
         if is_error and not text:
             raise TargetError("Tool meldet einen Fehler ohne Text")
         return text
+
+
+class StdioTransport:
+    """MCP über stdio: der Server läuft als lokaler Prozess, Nachrichten sind JSON-Zeilen."""
+
+    def __init__(self, command: str, timeout: float = 60):
+        from .scanners import resolve, search_path, split_cmd
+
+        self.args = resolve(split_cmd(command, "garak"))
+        self.env = {**os.environ, "PATH": search_path()}
+        self.timeout = timeout
+        self.proc: asyncio.subprocess.Process | None = None
+        self.stderr: list[str] = []
+
+    async def start(self) -> None:
+        if self.proc:
+            return
+        try:
+            self.proc = await asyncio.create_subprocess_exec(
+                *self.args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=self.env,
+                limit=16 * 1024 * 1024,
+            )
+        except (FileNotFoundError, PermissionError) as exc:
+            raise McpError(f"„{self.args[0]}“ nicht gefunden oder nicht ausführbar") from exc
+        asyncio.create_task(self._drain_stderr())
+
+    async def _drain_stderr(self) -> None:
+        assert self.proc and self.proc.stderr
+        async for line in self.proc.stderr:
+            self.stderr = [*self.stderr[-20:], line.decode(errors="replace").rstrip()]
+
+    async def send(self, payload: dict) -> None:
+        await self.start()
+        assert self.proc and self.proc.stdin
+        if self.proc.returncode is not None:
+            raise McpError(self._died())
+        self.proc.stdin.write((json.dumps(payload) + "\n").encode())
+        await self.proc.stdin.drain()
+
+    async def receive(self, msg_id: int) -> dict:
+        assert self.proc and self.proc.stdout
+
+        async def read() -> dict:
+            while True:
+                line = await self.proc.stdout.readline()  # type: ignore[union-attr]
+                if not line:
+                    raise McpError(self._died())
+                msg = _parse(line.decode(errors="replace").strip())
+                if isinstance(msg, dict) and msg.get("id") == msg_id and "method" not in msg:
+                    return msg
+
+        try:
+            return await asyncio.wait_for(read(), self.timeout)
+        except TimeoutError as exc:
+            raise McpError(
+                f"Lokaler MCP-Server antwortet nicht innerhalb {self.timeout:.0f} s"
+            ) from exc
+
+    def _died(self) -> str:
+        tail = " | ".join(self.stderr[-4:])
+        return "Lokaler MCP-Server wurde beendet" + (f": {tail}" if tail else "")
+
+    async def close(self) -> None:
+        if self.proc and self.proc.returncode is None:
+            self.proc.terminate()
+            try:
+                await asyncio.wait_for(self.proc.wait(), 5)
+            except TimeoutError:
+                self.proc.kill()
+
+
+class StdioMixin:
+    """Ersetzt den HTTP-Transport eines McpClient durch stdio."""
+
+    stdio: StdioTransport
+
+    async def rpc(self, method: str, params: dict | None = None, *, extra: dict | None = None):  # type: ignore[override]
+        self._id += 1  # type: ignore[attr-defined]
+        msg_id = self._id  # type: ignore[attr-defined]
+        await self.stdio.send(
+            {"jsonrpc": "2.0", "id": msg_id, "method": method, "params": params or {}}
+        )
+        data = await self.stdio.receive(msg_id)
+        self.last_status = 200  # type: ignore[attr-defined]
+        if "error" in data:
+            err = data["error"] or {}
+            raise McpError(f"{method}: {err.get('message', err)} (Code {err.get('code')})")
+        return data.get("result")
+
+    async def notify(self, method: str) -> None:
+        await self.stdio.send({"jsonrpc": "2.0", "method": method})
+
+    async def close(self) -> None:
+        await self.stdio.close()
+        await super().close()  # type: ignore[misc]
+
+
+class McpStdioClient(StdioMixin, McpClient):
+    def __init__(self, target: Target, account, secrets_: dict[str, str | None], **kw):
+        super().__init__(target, account, secrets_, **kw)
+        self.stdio = StdioTransport(target.mcp_command or "")
+        self.logged_in = True
+
+
+class McpStdioToolSession(StdioMixin, McpToolSession):
+    def __init__(self, target: Target, account, secrets_: dict[str, str | None], **kw):
+        super().__init__(target, account, secrets_, **kw)
+        self.stdio = StdioTransport(target.mcp_command or "")
+        self.logged_in = True
+
+
+def tool_session_class(target: Target) -> type[McpClient]:
+    return McpStdioToolSession if target.mcp_command else McpToolSession
 
 
 async def _read_message(resp: httpx.Response, msg_id: int) -> dict | None:
@@ -565,7 +683,8 @@ def _session(
         values["mfa_code"] = mfa_codes.get(account.name)
     else:
         values["mfa_code"] = mfa_codes.get("")
-    return McpClient(target, account, values, anonymous=anonymous)
+    cls = McpStdioClient if target.mcp_command else McpClient
+    return cls(target, account, values, anonymous=anonymous)
 
 
 async def connect(
@@ -598,7 +717,8 @@ def build_plan(
         mod = mcp_module(key)
         plan = Plan(mod)
         if key == "mcp_auth":
-            plan.probes += _auth_probes(target, keys, mfa_codes)
+            if not target.mcp_command:  # lokaler Prozess: keine Netzwerk-Anmeldung zu prüfen
+                plan.probes += _auth_probes(target, keys, mfa_codes)
         elif key == "mcp_poisoning":
             if client.instructions:
                 plan.probes.append(_poison_probe("Server-Anweisungen", client.instructions, None))
