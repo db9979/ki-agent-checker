@@ -9,6 +9,7 @@ import {
   Swords,
   Trash2,
 } from "lucide-react";
+import { CustomAttacks } from "../components/CustomAttacks";
 import { HelpLink } from "../components/HelpLink";
 import { useState } from "react";
 import { api } from "../lib/engine";
@@ -69,13 +70,15 @@ export function Skills() {
     <div className="space-y-4">
       <header>
         <h1 className="flex items-center gap-2 text-2xl font-semibold">
-          Skills <HelpLink anchor="skills" />
+          Skills & eigene Angriffe <HelpLink anchor="skills" />
         </h1>
         <p className="text-sm text-muted">
           Angriffe und Gegenmaßnahmen aus Skill-Sammlungen übernehmen. Gelesen werden nur die SKILL.md-Dateien, Skripte
           werden nie ausgeführt.
         </p>
       </header>
+
+      <CustomAttacks />
 
       <div className="grid grid-cols-12 gap-4">
         <section className="panel col-span-12 space-y-3 p-5 lg:col-span-4">

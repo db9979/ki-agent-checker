@@ -46,6 +46,7 @@ export interface RunSummary {
   id: string;
   project_id: string | null;
   target: string;
+  target_id?: string | null;
   started_at: string;
   finished_at: string | null;
   status: string;
@@ -125,6 +126,7 @@ export interface AttackModuleInfo {
   target: "agent" | "mcp";
   calls_tools?: boolean;
   skill?: boolean;
+  custom?: boolean;
 }
 
 export interface Skill {

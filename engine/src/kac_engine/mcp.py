@@ -890,7 +890,7 @@ async def run_mcp(
     run_id: str,
 ) -> str:
     label = f"MCP-Server {target.describe()}"
-    store.start_run(run_id, project_id, label)
+    store.start_run(run_id, project_id, label, target.id)
     findings: list[Finding] = []
     status = "finished"
     client: McpClient | None = None

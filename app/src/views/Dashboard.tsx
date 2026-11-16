@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { HelpLink } from "../components/HelpLink";
-import { Crosshair, Play, Rocket, ShieldAlert } from "lucide-react";
+import { Crosshair, Loader2, Play, RotateCcw, Rocket, ShieldAlert } from "lucide-react";
 import type { View } from "../App";
 import { openOnboarding } from "../lib/onboarding";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { api } from "../lib/engine";
 import { ModuleRadar, TrendChart } from "../components/Charts";
 import { Heatmap, type HeatRow } from "../components/Heatmap";
 import { ReportButton } from "../components/ReportButton";
@@ -30,6 +31,8 @@ export function Dashboard({ onNavigate }: { onNavigate: (v: View) => void }) {
     .reverse();
 
   const score = live ? liveScore(run) : (last?.score ?? null);
+  // „Nur das erneut testen“ nach einem Fix: nur für abgeschlossene Läufe mit bekanntem Ziel
+  const retestTarget = !live || run.status === "finished" ? (live ? (runs ?? []).find((r) => r.id === run.runId)?.target_id : last?.target_id) ?? null : null;
   const findings: Finding[] = live ? run.findings : (last?.findings ?? []);
 
   const rows: HeatRow[] = useMemo(() => {
@@ -190,6 +193,9 @@ export function Dashboard({ onNavigate }: { onNavigate: (v: View) => void }) {
                   <span className="ml-auto text-xs tabular-nums text-muted">
                     {Math.round(f.success_rate * 100)} % erfolgreich
                   </span>
+                  {retestTarget && !/^(garak|promptfoo):/.test(f.module) && (
+                    <RetestButton targetId={retestTarget} module={f.module} onStarted={() => onNavigate("live")} />
+                  )}
                 </div>
                 <p className="mt-2 text-sm text-text/80">
                   <span className="font-medium text-green">Gegenmaßnahme: </span>
@@ -202,6 +208,32 @@ export function Dashboard({ onNavigate }: { onNavigate: (v: View) => void }) {
         )}
       </section>
     </div>
+  );
+}
+
+function RetestButton({ targetId, module, onStarted }: { targetId: string; module: string; onStarted: () => void }) {
+  const [state, setState] = useState<"idle" | "busy" | string>("idle");
+  const start = async () => {
+    setState("busy");
+    try {
+      await api("/runs", { method: "POST", body: JSON.stringify({ target_id: targetId, modules: [module] }) });
+      onStarted();
+    } catch (e) {
+      setState(String((e as Error).message));
+    }
+  };
+  return (
+    <button
+      onClick={start}
+      disabled={state === "busy"}
+      title={state !== "idle" && state !== "busy" ? state : "Nach einem Fix nur dieses Modul gegen dasselbe Ziel wiederholen"}
+      className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] transition ${
+        state !== "idle" && state !== "busy" ? "border-red/50 text-red" : "border-line text-muted hover:border-cyan hover:text-cyan"
+      }`}
+    >
+      {state === "busy" ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+      {state !== "idle" && state !== "busy" ? "Fehler" : "Nur das erneut testen"}
+    </button>
   );
 }
 

@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, detect, mcp, providers, report, scanners, skills
+from . import __version__, custom, detect, mcp, providers, report, scanners, skills
 from . import attacks as attack_lib
 from . import compare as compare_lib
 from . import graph as graph_lib
@@ -113,6 +113,10 @@ class DetectIn(BaseModel):
     verify_tls: bool = True
 
 
+class CustomImportIn(BaseModel):
+    yaml: str = Field(max_length=500_000)
+
+
 class DemoRunIn(BaseModel):
     project_id: str | None = None
     delay: float = 0.6
@@ -138,7 +142,15 @@ def create_app(
     keys = secrets or SecretStore()
     tasks: dict[str, asyncio.Task] = {}
     app.state.store, app.state.hub, app.state.keys = store, hub, keys
-    attack_lib.register([m for s in store.list_skills() if (m := skills.to_module(s))])
+
+    def _register() -> None:
+        """Zusatzmodule: Angriffstexte aus Skills und eigene Angriffe."""
+        attack_lib.register(
+            [m for s in store.list_skills() if (m := skills.to_module(s))]
+            + [custom.to_module(c) for c in store.list_custom()]
+        )
+
+    _register()
 
     def check(supplied: str | None) -> None:
         if token is None:
@@ -653,7 +665,7 @@ def create_app(
 
     # Skills ---------------------------------------------------------------
     def _refresh_skills() -> None:
-        attack_lib.register([m for s in store.list_skills() if (m := skills.to_module(s))])
+        _register()
 
     @app.get("/skills", dependencies=protected)
     def list_skills() -> list[dict]:
@@ -699,6 +711,41 @@ def create_app(
             raise HTTPException(404, "Skill nicht gefunden")
         _refresh_skills()
 
+    # Eigene Angriffe --------------------------------------------------------
+    @app.get("/custom-modules", dependencies=protected)
+    def list_custom() -> list[dict]:
+        return [m.model_dump(mode="json") for m in store.list_custom()]
+
+    @app.post("/custom-modules", dependencies=protected)
+    def save_custom(data: custom.CustomModule) -> dict:
+        module = data.normalized()
+        store.save_custom(module)
+        _register()
+        store.audit("custom.saved", {"key": module.key, "attacks": len(module.attacks)})
+        return module.model_dump(mode="json")
+
+    @app.post("/custom-modules/import", dependencies=protected)
+    def import_custom(data: CustomImportIn) -> dict:
+        try:
+            modules = custom.parse_yaml(data.yaml)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        for m in modules:
+            store.save_custom(m)
+        _register()
+        store.audit("custom.imported", {"keys": [m.key for m in modules]})
+        return {"imported": len(modules), "attacks": sum(len(m.attacks) for m in modules)}
+
+    @app.get("/custom-modules/export", dependencies=protected)
+    def export_custom() -> dict:
+        return {"yaml": custom.to_yaml(store.list_custom())}
+
+    @app.delete("/custom-modules/{key:path}", dependencies=protected, status_code=204)
+    def delete_custom(key: str) -> None:
+        if not store.delete_custom(key):
+            raise HTTPException(404, "Eigener Angriff nicht gefunden")
+        _register()
+
     @app.get("/attack-modules", dependencies=protected)
     def attack_modules() -> list[dict]:
         return [
@@ -713,6 +760,7 @@ def create_app(
                 "title": m.title,
                 "target": "agent",
                 "skill": m.key.startswith("skill:"),
+                "custom": m.key.startswith(custom.PREFIX),
             }
             for m in attack_lib.all_modules()
         ] + [
