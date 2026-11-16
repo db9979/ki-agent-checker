@@ -30,6 +30,7 @@ from . import (
     report,
     scanners,
     skills,
+    update,
 )
 from . import attacks as attack_lib
 from . import compare as compare_lib
@@ -192,6 +193,11 @@ def create_app(
     @app.get("/health")
     def health() -> dict:
         return {"status": "ok", "version": __version__, "keyring": keys.persistent}
+
+    @app.get("/update", dependencies=protected)
+    async def update_check(force: bool = False) -> dict:
+        """Neue Version auf GitHub? Liefert den passenden Installer für dieses System."""
+        return await update.check(force)
 
     # Provider ------------------------------------------------------------
     @app.get("/providers", dependencies=protected)
