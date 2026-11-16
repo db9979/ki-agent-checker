@@ -125,7 +125,7 @@ async def run_target(
     )
     total = sum(len(items) for _, items in planned)
     label = target.describe()
-    store.start_run(run_id, cfg.project_id, label)
+    store.start_run(run_id, cfg.project_id, label, target.id)
     await hub.publish(
         "run.started",
         run_id,

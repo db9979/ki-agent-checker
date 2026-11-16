@@ -34,7 +34,7 @@ const NAV = [
   { id: "compare", label: "Vergleich", icon: GitCompareArrows },
   { id: "models", label: "Modelle", icon: Server },
   { id: "projects", label: "Projekte", icon: FolderKanban },
-  { id: "skills", label: "Skills", icon: BookOpen },
+  { id: "skills", label: "Skills & Angriffe", icon: BookOpen },
   { id: "help", label: "Hilfe", icon: LifeBuoy },
 ] as const;
 

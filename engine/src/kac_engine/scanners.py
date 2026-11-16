@@ -470,7 +470,7 @@ async def run_scanner(
     run_id: str,
     graph: dict | None = None,
 ) -> str:
-    store.start_run(run_id, project_id, f"{label} · {cfg.tool}")
+    store.start_run(run_id, project_id, f"{label} · {cfg.tool}", target_id)
     await hub.publish("run.started", run_id, target=f"{label} · {cfg.tool}", total=0, modules=[])
     requests = 0
     started = time.monotonic()

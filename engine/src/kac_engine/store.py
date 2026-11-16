@@ -9,6 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .custom import CustomModule
 from .models import (
     SELF_HOSTED_KINDS,
     Finding,
@@ -70,6 +71,10 @@ CREATE TABLE IF NOT EXISTS skills (
     name TEXT PRIMARY KEY,
     config TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS custom_modules (
+    key TEXT PRIMARY KEY,
+    config TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     at TEXT NOT NULL,
@@ -99,6 +104,9 @@ class Store:
             self._db.execute(
                 "ALTER TABLE providers ADD COLUMN verify_tls INTEGER NOT NULL DEFAULT 1"
             )
+        run_columns = {r["name"] for r in self._db.execute("PRAGMA table_info(runs)")}
+        if "target_id" not in run_columns:
+            self._db.execute("ALTER TABLE runs ADD COLUMN target_id TEXT")
 
     # Audit-Log -----------------------------------------------------------
     def audit(self, action: str, detail: dict) -> None:
@@ -223,11 +231,14 @@ class Store:
         ]
 
     # Testläufe -----------------------------------------------------------
-    def start_run(self, run_id: str, project_id: str | None, target: str) -> None:
+    def start_run(
+        self, run_id: str, project_id: str | None, target: str, target_id: str | None = None
+    ) -> None:
         with self._lock:
             self._db.execute(
-                "INSERT INTO runs (id, project_id, target, started_at, status) VALUES (?, ?, ?, ?, ?)",
-                (run_id, project_id, target, _now().isoformat(), "running"),
+                "INSERT INTO runs (id, project_id, target, started_at, status, target_id) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (run_id, project_id, target, _now().isoformat(), "running", target_id),
             )
             self._db.commit()
 
@@ -252,6 +263,7 @@ class Store:
                 id=r["id"],
                 project_id=r["project_id"],
                 target=r["target"],
+                target_id=r["target_id"],
                 started_at=datetime.fromisoformat(r["started_at"]),
                 finished_at=datetime.fromisoformat(r["finished_at"]) if r["finished_at"] else None,
                 status=r["status"],
@@ -290,6 +302,25 @@ class Store:
     def get_run_log(self, run_id: str) -> list[dict]:
         row = self._db.execute("SELECT log FROM run_logs WHERE run_id = ?", (run_id,)).fetchone()
         return json.loads(row["log"]) if row else []
+
+    # Eigene Angriffe -------------------------------------------------------
+    def list_custom(self) -> list[CustomModule]:
+        rows = self._db.execute("SELECT config FROM custom_modules ORDER BY key").fetchall()
+        return [CustomModule.model_validate_json(r["config"]) for r in rows]
+
+    def save_custom(self, module: CustomModule) -> None:
+        with self._lock:
+            self._db.execute(
+                "INSERT OR REPLACE INTO custom_modules VALUES (?, ?)",
+                (module.key, module.model_dump_json()),
+            )
+            self._db.commit()
+
+    def delete_custom(self, key: str) -> bool:
+        with self._lock:
+            cur = self._db.execute("DELETE FROM custom_modules WHERE key = ?", (key,))
+            self._db.commit()
+        return cur.rowcount > 0
 
     # Ziele -----------------------------------------------------------------
     def save_target(self, target: Target) -> None:

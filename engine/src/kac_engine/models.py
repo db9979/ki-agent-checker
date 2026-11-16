@@ -98,6 +98,7 @@ class RunSummary(BaseModel):
     id: str
     project_id: str | None
     target: str
+    target_id: str | None = None
     started_at: datetime
     finished_at: datetime | None = None
     status: str
