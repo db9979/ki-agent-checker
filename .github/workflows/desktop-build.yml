@@ -1,7 +1,7 @@
 name: Desktop-Build
 
 # Baut Installer für Windows, macOS und Linux.
-# Läuft bei Pushes auf main, bei Tags (v*) und manuell, nicht bei jedem PR,
+# Läuft bei Pushes auf main, bei Tags (v*, dann auch als GitHub Release) und manuell, nicht bei jedem PR,
 # weil macOS- und Windows-Minuten auf GitHub teurer sind.
 on:
   push:
@@ -94,3 +94,49 @@ jobs:
             app/src-tauri/target/release/bundle/**/*.AppImage
             app/src-tauri/target/release/bundle/**/*.deb
           if-no-files-found: warn
+
+  # Bei einem Tag v* (z. B. v0.1.0) landen alle Installer als GitHub Release.
+  release:
+    name: Release veröffentlichen
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version prüfen
+        run: |
+          APP=$(jq -r .version app/src-tauri/tauri.conf.json)
+          if [ "v$APP" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME passt nicht zur App-Version $APP (app/src-tauri/tauri.conf.json)"; exit 1
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find dist -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) > files.txt
+          cat files.txt
+          cat > notes.md <<'NOTES'
+          ## Download
+
+          | System | Datei |
+          |---|---|
+          | Windows (x64) | `…_x64-setup.exe` oder `…_x64_en-US.msi` |
+          | Windows (ARM64) | `…_arm64-setup.exe` oder `…_arm64_en-US.msi` |
+          | macOS (Apple Silicon) | `…_aarch64.dmg` |
+          | Linux (x64) | `…_amd64.deb` oder `…_amd64.AppImage` |
+          | Linux (ARM64, z. B. uConsole) | `…_arm64.deb` oder `…_aarch64.AppImage` |
+
+          Die Installer sind nicht signiert. Windows SmartScreen: „Weitere Informationen“ → „Trotzdem ausführen“. macOS: beim ersten Start unter Systemeinstellungen → Datenschutz & Sicherheit auf „Dennoch öffnen“ klicken.
+          NOTES
+          sed -i 's/^          //' notes.md
+          gh release create "$GITHUB_REF_NAME" --title "KI-Agent-Checker $GITHUB_REF_NAME" \
+            --notes-file notes.md --generate-notes $(cat files.txt)
