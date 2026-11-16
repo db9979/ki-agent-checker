@@ -635,9 +635,17 @@ MODULE_KEYS = [m.key for m in LIBRARY]
 EXTRA: dict[str, AttackModule] = {}
 
 
+# Module externer Datensätze (PyRIT), werden je Lauf neu geladen und nicht aufgelistet
+SOURCES: dict[str, AttackModule] = {}
+
+
 def register(modules: list[AttackModule]) -> None:
     EXTRA.clear()
     EXTRA.update({m.key: m for m in modules})
+
+
+def register_source(modules: list[AttackModule]) -> None:
+    SOURCES.update({m.key: m for m in modules})
 
 
 def all_modules() -> list[AttackModule]:
@@ -651,6 +659,8 @@ def all_keys() -> list[str]:
 def module(key: str) -> AttackModule:
     if key in EXTRA:
         return EXTRA[key]
+    if key in SOURCES:
+        return SOURCES[key]
     return next(m for m in LIBRARY if m.key == key)
 
 

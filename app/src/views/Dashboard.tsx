@@ -41,7 +41,10 @@ export function Dashboard({ onNavigate }: { onNavigate: (v: View) => void }) {
     }
     const mcpRun =
       !!last && (last.target.startsWith("MCP-Server") || last.findings.some((f) => f.module.startsWith("mcp_")));
-    return MODULES.filter((m) => m.key.startsWith("mcp_") === mcpRun).map((m) => {
+    const pyritRun = !!last?.findings.some((f) => f.module.startsWith("pyrit:"));
+    return MODULES.filter(
+      (m) => m.key.startsWith("mcp_") === mcpRun && (!m.key.startsWith("pyrit:") || pyritRun),
+    ).map((m) => {
       const f = last?.findings.find((x) => x.module === m.key);
       return { ...m, attempts: last ? 1 : 0, rate: last ? (f?.success_rate ?? 0) : null };
     });
@@ -193,7 +196,7 @@ export function Dashboard({ onNavigate }: { onNavigate: (v: View) => void }) {
                   <span className="ml-auto text-xs tabular-nums text-muted">
                     {Math.round(f.success_rate * 100)} % erfolgreich
                   </span>
-                  {retestTarget && !/^(garak|promptfoo):/.test(f.module) && (
+                  {retestTarget && !/^(garak|promptfoo|pyrit):/.test(f.module) && (
                     <RetestButton targetId={retestTarget} module={f.module} onStarted={() => onNavigate("live")} />
                   )}
                 </div>

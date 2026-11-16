@@ -87,7 +87,7 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
   const names = target.accounts.length ? target.accounts.map((a) => a.name) : [""];
   const [codes, setCodes] = useState<Record<string, string>>({});
   const missingCode = manual && names.some((n) => !codes[n]);
-  const [source, setSource] = useState<"own" | "garak" | "promptfoo">("own");
+  const [source, setSource] = useState<"own" | "garak" | "promptfoo" | "pyrit">("own");
   const [profile, setProfile] = useState<Profile>("standard");
   const isUnavailable = (m: AttackModuleInfo) =>
     m.needs_accounts > pairs || (noCalls && !!m.calls_tools) || (!!m.needs_attacker && !attacker);
@@ -101,7 +101,7 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
   const attackCount = chosen.reduce((n, m) => n + (m.attacks ? Math.min(m.attacks, cap ?? m.attacks) : 1), 0);
   const minutes = Math.max(1, Math.round((attackCount * ((target.delay ?? 0.5) + 3) * (judge ? 1.5 : 1)) / 60));
   const [scanner, setScanner] = useState<ScannerSettings>(loadScanner("garak"));
-  const pick = (s: "own" | "garak" | "promptfoo") => {
+  const pick = (s: "own" | "garak" | "promptfoo" | "pyrit") => {
     setSource(s);
     if (s !== "own") setScanner(loadScanner(s));
   };
@@ -141,12 +141,13 @@ function RunPanel({ target, onStarted, onClose }: { target: Target; onStarted: (
         </button>
       </div>
       {!isMcp && (
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-4 gap-1">
           {(
             [
               ["own", "Eigene Angriffe"],
               ["garak", "garak"],
               ["promptfoo", "Promptfoo"],
+              ["pyrit", "PyRIT"],
             ] as const
           ).map(([key, label]) => (
             <button

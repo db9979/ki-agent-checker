@@ -19,7 +19,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, custom, detect, mcp, oauth, providers, report, scanners, skills
+from . import (
+    __version__,
+    custom,
+    detect,
+    mcp,
+    oauth,
+    providers,
+    pyrit_source,
+    report,
+    scanners,
+    skills,
+)
 from . import attacks as attack_lib
 from . import compare as compare_lib
 from . import graph as graph_lib
@@ -65,7 +76,7 @@ class DiscoverIn(BaseModel):
 
 
 class ScannerIn(BaseModel):
-    tool: Literal["garak", "promptfoo"]
+    tool: Literal["garak", "promptfoo", "pyrit"]
     cmd: str = ""
     probes: str = ""
     purpose: str = ""
@@ -515,9 +526,22 @@ def create_app(
             await oauth.refresh_if_needed(target, keys)
         except TargetError as exc:
             raise HTTPException(422, str(exc)) from exc
-        if data.scanner:
+        source_keys: list[str] = []
+        if data.scanner and data.scanner.tool == "pyrit":
+            if target.kind == TargetKind.MCP:
+                raise HTTPException(422, "PyRIT testet Chat-Ziele und Tools, keine MCP-Server")
+            try:
+                pkg = await pyrit_source.locate(data.scanner.cmd)
+                built = pyrit_source.build(pkg, data.scanner.max_prompts, data.scanner.probes)
+            except scanners.ScannerError as exc:
+                raise HTTPException(422, str(exc)) from exc
+            attack_lib.register_source(built)
+            source_keys = [m.key for m in built]
+            data = data.model_copy(update={"modules": source_keys, "max_per_module": None})
+        elif data.scanner:
             return _start_scanner(data, target, project.id, str(request.base_url).rstrip("/"))
         known = mcp.MCP_KEYS if target.kind == TargetKind.MCP else attack_lib.all_keys()
+        known = [*known, *source_keys]
         modules = data.modules or (
             known if target.kind == TargetKind.MCP else attack_lib.MODULE_KEYS
         )
@@ -653,6 +677,8 @@ def create_app(
 
     @app.get("/scanners/check", dependencies=protected)
     async def check_scanner(tool: str, cmd: str = "") -> dict:
+        if tool == "pyrit":
+            return await pyrit_source.check(cmd)
         try:
             return await scanners.check(tool, cmd)
         except scanners.ScannerError as exc:

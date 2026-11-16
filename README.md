@@ -7,7 +7,7 @@ die Ergebnisse visualisiert und Gegenmaßnahmen vorschlägt. Selbst gehostete Mo
 (OpenAI, Anthropic, Gemini, Mistral) werden gleichermaßen unterstützt.
 
 **[Anleitung](docs/ANLEITUNG.md)** · Beim ersten Start führt eine Einrichtung durch Projekt, Ziel,
-Testquellen (garak, Promptfoo, Skills) und den ersten Lauf. Die Anleitung steht auch in der App unter **Hilfe**.
+Testquellen (garak, Promptfoo, PyRIT, Skills) und den ersten Lauf. Die Anleitung steht auch in der App unter **Hilfe**.
 
 | Einrichtung | Testquellen | Hilfe |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ Testquellen (garak, Promptfoo, Skills) und den ersten Lauf. Die Anleitung steht 
 | Modelle | LiteLLM-Anbindung, Modellsuche für Ollama und OpenAI-kompatible Server, Verbindungstest, Schlüssel im System-Schlüsselbund |
 | Projekte | Scope-Liste, Berechtigungsbestätigung, Audit-Log |
 | Visualisierung | Dashboard mit Security-Score, Heatmap Modul × OWASP LLM Top 10, Radar, Score-Verlauf, Angriffspfad durch vier Schutzschichten mit Terminal-Protokoll, Angriffsgraph aus dem echten Ziel (beim MCP-Server alle Tools nach Risiko gruppiert, live eingefärbt), Zeitleiste zum Abspielen eines Laufs |
-| Einrichtung und Hilfe | Geführte Einrichtung beim ersten Start (Projekt, Modell, Ziel, garak/Promptfoo inkl. E-Mail, Skills, erster Lauf), Anleitung in der App |
+| Einrichtung und Hilfe | Geführte Einrichtung beim ersten Start (Projekt, Modell, Ziel, garak/Promptfoo/PyRIT inkl. E-Mail, Skills, erster Lauf), Anleitung in der App |
 | Demo-Lauf | Vorbereiteter Lauf gegen einen fiktiven Kundenservice-Agenten, braucht kein Modell (in der Einrichtung und unter Hilfe) |
 | Ziele | Eigenes Modell mit System-Prompt und Honeypot-Tools, Agent mit OpenAI-kompatibler API oder beliebiger HTTP-Endpunkt (JSON-Vorlage) |
 | Anmeldung | API-Schlüssel, eigener Header, Basic Auth, Login-Aufruf mit Token oder Cookie, TOTP für 2FA, mehrere Testkonten mit Rollen |
@@ -108,6 +108,8 @@ Wählt man im Testlauf ein **Angreifer-Modell**, kommt das Modul „Mehrstufig�
 ### garak und Promptfoo
 
 Im Testlauf lassen sich statt der eigenen Angriffe auch [garak](https://github.com/NVIDIA/garak) oder [Promptfoo](https://www.promptfoo.dev/) wählen. Beide werden separat installiert (`pipx install garak`, auf dem Mac vorher `brew install pipx`; Promptfoo per `npx -y promptfoo@latest` mit Node.js 18+). Die App stellt für die Dauer des Laufs eine lokale Brücke bereit, über die der Scanner mit dem Ziel spricht. Anmeldung, 2FA, eigene Modelle und MCP-Tools funktionieren damit genauso wie bei den eigenen Angriffen. garak-Ergebnisse erscheinen live im Angriffspfad, Promptfoo-Ergebnisse nach dem Lauf. Befunde werden nach OWASP LLM Top 10 eingeordnet.
+
+Als dritte Quelle liest die App die Jailbreak-Vorlagen und Datensätze von [PyRIT](https://github.com/Azure/PyRIT) (`pipx install pyrit`, wird nicht mitgeliefert) und schickt sie über die eigenen Sitzungen ans Ziel; die Ergebnisse erscheinen live wie bei den eigenen Angriffen.
 
 ### Ein MCP-Tool als Agent angreifen
 
