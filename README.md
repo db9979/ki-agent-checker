@@ -188,6 +188,7 @@ Fertige Installer gibt es unter [Releases](https://github.com/db9979/ki-agent-ch
 Der Workflow `Desktop-Build` baut automatisch bei jedem Push auf `main` und bei Tags `v*`.
 Ein Tag legt zusätzlich ein GitHub Release mit allen Installern an. Die Version im Tag muss zu
 `app/src-tauri/tauri.conf.json` passen, z. B. `git tag v0.1.0 && git push origin v0.1.0`.
+Ohne Tag geht es auch über Actions → Desktop-Build → Run workflow mit Haken bei „release“.
 
 | System | Pakete |
 | --- | --- |
